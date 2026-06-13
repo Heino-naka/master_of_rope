@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master of Rope - なわとび検定シミュレーター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #0b1120;
+        }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .transition-all { transition: all 0.2s ease-in-out; }
+        #touch-spin-btn, #touch-cross-btn, #gameCanvas, .control-btn {
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        /* コンボ強調アニメ */
+        @keyframes pop { 0%{transform:scale(1);} 40%{transform:scale(1.45);} 100%{transform:scale(1);} }
+        .pop { animation: pop 0.28s ease-out; }
+        @keyframes flashGold { 0%{color:#fde047;text-shadow:0 0 18px rgba(253,224,71,.9);} 100%{} }
+        .flash-gold { animation: flashGold 0.5s ease-out; }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <!-- ヘッダー -->
+    <header class="bg-slate-900/90 border-b border-slate-800 py-3 px-4 md:px-6 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <span class="text-2xl drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]">⚡</span>
+                <h1 class="text-lg md:text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500 font-orbitron">
+                    MASTER OF ROPE
+                </h1>
+            </div>
+            <div class="flex items-center space-x-4 md:space-x-6">
+                <div class="text-right hidden sm:block">
+                    <span class="text-[10px] text-slate-400 block font-bold tracking-widest">RANK</span>
+                    <span id="rank-display" class="text-sm md:text-base font-black text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,224,0.5)]">見習い</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-400 block font-bold tracking-widest">TOTAL JUMPS</span>
+                    <span id="total-jumps-display" class="text-xl md:text-2xl font-black text-yellow-400 font-orbitron drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]">0</span>
+                </div>
+                <button onclick="openShareModal('🪢 なわとびの記録')" class="bg-slate-800 hover:bg-sky-900/80 border border-slate-700 text-slate-300 hover:text-sky-300 text-[10px] font-bold py-1 px-2 rounded transition-all">
+                    📤 シェア
+                </button>
+                <button onclick="confirmReset()" class="bg-slate-800 hover:bg-red-900/80 border border-slate-700 text-slate-300 hover:text-red-300 text-[10px] font-bold py-1 px-2 rounded transition-all">
+                    初期化
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-6xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow w-full">
+
+        <!-- 左側：ゲームスクリーン＆操作パネル -->
+        <div class="lg:col-span-7 flex flex-col space-y-4">
+
+            <!-- ステータスバー（コンボ・技名） -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 md:p-4 flex justify-between items-center shadow-lg relative overflow-hidden">
+                <div class="z-10 text-center w-1/4">
+                    <span class="text-[10px] text-slate-400 font-bold block tracking-widest">COMBO</span>
+                    <span id="combo-display" class="text-3xl md:text-4xl font-black text-emerald-400 font-orbitron drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]">0</span>
+                </div>
+                <div class="z-10 text-center px-2 py-2 bg-slate-950 rounded-lg border border-slate-800 flex-grow mx-2 md:mx-4 min-h-[60px] flex flex-col justify-center">
+                    <span id="mode-badge" class="text-[9px] font-bold px-2 py-0.5 rounded absolute top-2 left-1/2 -translate-x-1/2 bg-slate-800 text-slate-300">IDLE</span>
+                    <span id="trick-name" class="text-base md:text-xl font-black text-yellow-400 tracking-wider mt-2">READY</span>
+                    <span id="trick-desc" class="text-[10px] text-slate-400 mt-0.5 font-bold">準備完了</span>
+                </div>
+                <div class="z-10 text-center w-1/4">
+                    <span class="text-[10px] text-slate-400 font-bold block tracking-widest">BEST</span>
+                    <span id="best-combo-display" class="text-2xl font-black text-slate-300 font-orbitron">0</span>
+                </div>
+            </div>
+
+            <!-- ゲームキャンバス -->
+            <div class="relative bg-slate-950 rounded-2xl border-2 border-slate-800 overflow-hidden shadow-2xl aspect-[16/9] w-full flex items-center justify-center">
+                <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+                <!-- 暗転オーバーレイ（非アクティブ時） -->
+                <div id="idle-overlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex flex-col justify-center items-center transition-opacity duration-300 p-4 text-center">
+                    <div id="howto-box" class="hidden mb-4 max-w-md bg-slate-900/90 border border-emerald-700/50 rounded-xl p-4 text-left shadow-xl">
+                        <p class="text-emerald-400 font-black text-sm mb-2 tracking-wider">🎮 あそびかた</p>
+                        <ul class="text-[11px] text-slate-300 leading-relaxed space-y-1 font-bold">
+                            <li>① キャラは<span class="text-yellow-300">自動でジャンプ</span>します。</li>
+                            <li>② キャラ脇の<span class="text-emerald-400">縦ゲージ</span>。体が緑のうちに<span class="text-emerald-400">「回す」</span>を押す。</li>
+                            <li>③ 緑のど真ん中＝<span class="text-yellow-300">PERFECT</span>で高得点＆コンボUP！</li>
+                            <li>④ 空中で連打すると<span class="text-cyan-300">二重跳び</span>。「交差」で技が増える。</li>
+                        </ul>
+                    </div>
+                    <p class="text-slate-300 font-bold tracking-widest mb-4 drop-shadow-md">休憩中</p>
+                    <button onclick="startGame('PRACTICE')" class="control-btn bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg py-3 px-8 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95">
+                        ▶ 練習スタート
+                    </button>
+                </div>
+
+                <!-- 息切れオーバーレイ（スタミナ回復と再開） -->
+                <div id="exhausted-overlay" class="absolute inset-0 bg-red-950/80 backdrop-blur-sm flex flex-col justify-center items-center p-6 text-center opacity-0 pointer-events-none transition-opacity duration-300 z-20">
+                    <span id="exhausted-emoji" class="text-6xl mb-2 animate-bounce">🥵</span>
+                    <h3 id="exhausted-title" class="text-2xl font-black text-red-400 drop-shadow-md">息切れ！</h3>
+                    <p id="exhausted-desc" class="text-xs text-red-200 max-w-xs leading-relaxed mt-2 font-bold">
+                        スタミナが尽きました。<br>しばらく休んで回復を待ちましょう。
+                    </p>
+                    <div id="recovery-counter" class="mt-4 text-4xl font-orbitron font-black text-red-300 tracking-widest drop-shadow-md">
+                        --
+                    </div>
+                    <button id="resume-btn" onclick="resumeGame()" class="hidden mt-6 control-btn bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg py-3 px-8 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95">
+                        ▶ 再開する
+                    </button>
+                </div>
+            </div>
+
+            <!-- 操作パネル -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-lg">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold text-slate-400 tracking-wider">CONTROLS</span>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="toggleAssist()" id="assist-btn" class="control-btn bg-slate-700 hover:bg-cyan-700 text-slate-200 text-[10px] font-bold py-1 px-3 rounded transition-all">
+                            🧸 アシスト: OFF
+                        </button>
+                        <button onclick="stopGame()" id="stop-btn" class="control-btn bg-slate-700 hover:bg-red-600 text-white text-[10px] font-bold py-1 px-4 rounded transition-all opacity-50 cursor-not-allowed" disabled>
+                            ⏹ 練習を止める
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="touch-spin-btn" class="control-btn bg-emerald-500 active:bg-emerald-400 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-xl shadow-[0_4px_0_#047857] active:shadow-[0_0px_0_#047857] active:translate-y-1 transition-all flex flex-col items-center justify-center opacity-50 pointer-events-none">
+                        <span class="text-xl">🔄 回す</span>
+                        <span class="text-[10px] opacity-80 mt-1 font-orbitron">SPACE</span>
+                    </button>
+                    <button id="touch-cross-btn" class="control-btn bg-amber-500 text-slate-950 font-black py-5 rounded-xl shadow-[0_4px_0_#d97706] active:translate-y-1 transition-all flex flex-col items-center justify-center opacity-50 pointer-events-none">
+                        <span id="touch-cross-text" class="text-xl">🙆 通常</span>
+                        <span class="text-[10px] opacity-80 mt-1 font-orbitron">SHIFT (HOLD/TAP)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：育成、ショップ、検定 -->
+        <div class="lg:col-span-5 flex flex-col space-y-4">
+
+            <!-- タブ切り替え -->
+            <div class="bg-slate-900 p-1 rounded-xl border border-slate-800 flex space-x-1 shadow-lg">
+                <button onclick="switchTab('training')" id="tab-btn-training" class="flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all bg-emerald-500 text-slate-950">
+                    💪 育成・装備
+                </button>
+                <button onclick="switchTab('exams')" id="tab-btn-exams" class="flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    📜 検定モード
+                </button>
+            </div>
+
+            <!-- タブ1: 育成 & 装備 -->
+            <div id="tab-content-training" class="space-y-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+                    <h3 class="text-xs font-black text-slate-500 tracking-widest border-b border-slate-800 pb-2 mb-3">PHYSICAL TRAINING</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                            <div class="flex-grow pr-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-base">🦘</span>
+                                    <span class="font-bold text-xs text-white">跳躍力 <span class="text-[10px] text-slate-400 font-normal">高さと滞空時間</span></span>
+                                </div>
+                                <div class="text-[10px] text-emerald-400 mt-1 font-bold font-orbitron">Lv. <span id="jump-lv">1</span> / 10</div>
+                            </div>
+                            <button onclick="buyUpgrade('jump')" id="upgrade-jump-btn" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black py-1.5 px-3 rounded text-[10px] transition-all flex flex-col items-center min-w-[70px]">
+                                <span>強化</span>
+                                <span class="text-[8px] opacity-80" id="jump-cost">250 J</span>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                            <div class="flex-grow pr-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-base">💪</span>
+                                    <span class="font-bold text-xs text-white">腕力 <span class="text-[10px] text-slate-400 font-normal">縄を回すスピード</span></span>
+                                </div>
+                                <div class="text-[10px] text-emerald-400 mt-1 font-bold font-orbitron">Lv. <span id="arm-lv">1</span> / 10</div>
+                            </div>
+                            <button onclick="buyUpgrade('arm')" id="upgrade-arm-btn" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black py-1.5 px-3 rounded text-[10px] transition-all flex flex-col items-center min-w-[70px]">
+                                <span>強化</span>
+                                <span class="text-[8px] opacity-80" id="arm-cost">200 J</span>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                            <div class="flex-grow pr-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-base">🔋</span>
+                                    <span class="font-bold text-xs text-white">スタミナ <span class="text-[10px] text-slate-400 font-normal">最大値と回復力</span></span>
+                                </div>
+                                <div class="text-[10px] text-emerald-400 mt-1 font-bold font-orbitron">Lv. <span id="stamina-lv">1</span> / 10</div>
+                            </div>
+                            <button onclick="buyUpgrade('stamina')" id="upgrade-stamina-btn" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black py-1.5 px-3 rounded text-[10px] transition-all flex flex-col items-center min-w-[70px]">
+                                <span>強化</span>
+                                <span class="text-[8px] opacity-80" id="stamina-cost">150 J</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+                    <h3 class="text-xs font-black text-slate-500 tracking-widest border-b border-slate-800 pb-2 mb-3">ROPE SHOP</h3>
+                    <div class="space-y-2" id="rope-shop-list"></div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+                    <h3 class="text-xs font-black text-slate-500 tracking-widest border-b border-slate-800 pb-2 mb-3">STAGE SELECT</h3>
+                    <div class="space-y-2" id="stage-list"></div>
+                </div>
+            </div>
+
+            <!-- タブ2: 検定 -->
+            <div id="tab-content-exams" class="hidden space-y-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+                    <h3 class="text-xs font-black text-slate-500 tracking-widest border-b border-slate-800 pb-2 mb-3">OFFICIAL EXAMS</h3>
+                    <p class="text-[10px] text-slate-400 leading-relaxed mb-4">
+                        お題を達成するとクリア。引っかかるか、停止すると失敗になります。<br>
+                        <span class="text-yellow-400">※検定中はJumpsを獲得できません。</span>
+                    </p>
+                    <div class="space-y-3" id="exam-list"></div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="border-t border-slate-800 bg-slate-900/80 py-5 px-4 mt-2">
+        <div class="max-w-6xl mx-auto flex flex-col items-center text-center space-y-1">
+            <p class="text-xs text-slate-400 font-bold tracking-wide">
+                Created by
+                <a href="https://suzuri.jp/Heino_naka" target="_blank" rel="noopener"
+                   class="text-yellow-400 hover:text-yellow-300 underline underline-offset-2 decoration-yellow-500/50 transition-all font-black">へいなか</a>
+            </p>
+            <p class="text-[10px] text-slate-600">⚡ Master of Rope — なわとび検定シミュレーター</p>
+        </div>
+    </footer>
+
+    <!-- カスタムモーダル -->
+    <div id="custom-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border border-slate-600 p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 transform scale-95 transition-transform duration-200" id="custom-modal-content">
+            <h3 id="modal-title" class="text-xl font-black text-white mb-3 tracking-wider">通知</h3>
+            <p id="modal-desc" class="text-sm text-slate-300 mb-6 leading-relaxed"></p>
+            <div class="flex justify-end space-x-3" id="modal-buttons"></div>
+        </div>
+    </div>
+
+    <!-- 結果シェアモーダル -->
+    <div id="share-modal" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border border-slate-600 p-5 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-200" id="share-modal-content">
+            <h3 id="share-title" class="text-lg font-black text-white mb-3 tracking-wider text-center">記録をシェア</h3>
+            <div class="rounded-xl overflow-hidden border border-slate-700 mb-4 bg-slate-950">
+                <img id="share-img" alt="結果カード" class="w-full block" />
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <button onclick="downloadCard()" class="control-btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-sm transition-all">📥 画像を保存</button>
+                <button onclick="tweetCard()" class="control-btn bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-lg text-sm transition-all">𝕏 でシェア</button>
+            </div>
+            <button id="webshare-btn" onclick="webShareCard()" class="hidden control-btn w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2.5 rounded-lg text-sm transition-all mb-2">📤 他のアプリでシェア</button>
+            <button onclick="closeShareModal()" class="control-btn w-full bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
+        </div>
+    </div>
+
+<script>
+// ==========================================
+// 💡 カスタムモーダル
+// ==========================================
+let modalConfirmCallback = null;
+function showModal(title, desc, isConfirm = false, onConfirm = null) {
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-desc').innerHTML = desc;
+    const btnContainer = document.getElementById('modal-buttons');
+    if (isConfirm) {
+        modalConfirmCallback = onConfirm;
+        btnContainer.innerHTML = `
+            <button onclick="closeModal()" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-bold transition-all">キャンセル</button>
+            <button onclick="confirmModalAction()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg">実行する</button>`;
+    } else {
+        btnContainer.innerHTML = `<button onclick="closeModal()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg">OK</button>`;
+    }
+    const modal = document.getElementById('custom-modal');
+    const content = document.getElementById('custom-modal-content');
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    content.classList.remove('scale-95'); content.classList.add('scale-100');
+}
+function closeModal() {
+    const modal = document.getElementById('custom-modal');
+    const content = document.getElementById('custom-modal-content');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    content.classList.remove('scale-100'); content.classList.add('scale-95');
+}
+function confirmModalAction() { if (modalConfirmCallback) modalConfirmCallback(); closeModal(); }
+
+// ==========================================
+// 🔊 オーディオシステム
+// ==========================================
+let audioCtx = null;
+function initAudio() {
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return; } }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+window.addEventListener('pointerdown', initAudio);
+window.addEventListener('keydown', initAudio);
+
+function playSwoosh(speed = 1) {
+    if (!audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        const dur = 0.22 / speed;
+        osc.frequency.setValueAtTime(260, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + dur);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+    } catch(e) {}
+}
+function playSuccess(spinCount = 1, perfect = false) {
+    if (!audioCtx) return;
+    try {
+        const baseFreq = (perfect ? 620 : 500) + (spinCount * 200);
+        for (let i = 0; i < Math.min(spinCount, 4); i++) {
+            const t = audioCtx.currentTime + i * 0.05;
+            const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = perfect ? 'square' : 'sine';
+            osc.frequency.setValueAtTime(baseFreq + i * 160, t);
+            gain.gain.setValueAtTime(perfect ? 0.12 : 0.13, t);
+            gain.gain.linearRampToValueAtTime(0.01, t + 0.1);
+            osc.start(t); osc.stop(t + 0.1);
+        }
+    } catch(e) {}
+}
+function playFail() {
+    if (!audioCtx) return;
+    try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(40, now + 0.3);
+        gain.gain.setValueAtTime(0.28, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        osc.start(); osc.stop(now + 0.3);
+    } catch(e) {}
+}
+function playCoin() {
+    if (!audioCtx) return;
+    try {
+        const now = audioCtx.currentTime;
+        [0,0.08].forEach((d,i)=>{
+            const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+            o.connect(g);g.connect(audioCtx.destination);o.type='square';
+            o.frequency.setValueAtTime(i?1318:988,now+d);
+            g.gain.setValueAtTime(0.12,now+d);g.gain.linearRampToValueAtTime(0.01,now+d+0.12);
+            o.start(now+d);o.stop(now+d+0.12);
+        });
+    } catch(e){}
+}
+
+// ==========================================
+// 💾 セーブデータ＆バランスマスタ
+// ==========================================
+const SAVE_KEY = "mor_ultimate_v2";
+
+const DEFAULT_SAVE = {
+    totalJumps: 0, lifetimeJumps: 0, highCombo: 0,
+    physical: { jumpLevel: 1, staminaLevel: 1, armLevel: 1 },
+    unlockedRopes: ['vinyl'], equippedRope: 'vinyl', passedExams: [],
+    unlockedStages: ['gym'], equippedStage: 'gym',
+    seenTutorial: false, assist: false
+};
+let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+
+const ROPES = {
+    vinyl:   { id:'vinyl',   name:'ビニールロープ', emoji:'🟢', price:0,     baseSpin:20, weightCost:5,  mult:1,   color:'#10b981', style:'smooth' },
+    bearing: { id:'bearing', name:'ベアリング',     emoji:'⚡', price:2500,  baseSpin:26, weightCost:4,  mult:1.2, color:'#38bdf8', style:'bead'  },
+    heavy:   { id:'heavy',   name:'ヘビーウエイト', emoji:'🏋️', price:9000,  baseSpin:17, weightCost:12, mult:2.5, color:'#a78bfa', style:'heavy' },
+    rainbow: { id:'rainbow', name:'レインボーLED',  emoji:'🌈', price:30000, baseSpin:30, weightCost:3,  mult:4,   color:'rainbow', style:'glow' }
+};
+
+// ステージ（背景）。floorY(=gY)は変えず、その上下の見た目だけを差し替える。
+const STAGES = {
+    gym:    { id:'gym',    name:'体育館',    emoji:'🏫', price:0,     sky:['#3a4a63','#22304a'], floor:'#b07a43', floorDark:'#8a5f33', line:'#ecdcae' },
+    ground: { id:'ground', name:'校庭',      emoji:'🏃', price:1500,  sky:['#5aa0d8','#cfe7f6'], floor:'#caa15e', floorDark:'#a07c41', line:'#f4f1e8' },
+    street: { id:'street', name:'夕方の路上', emoji:'🌆', price:4000,  sky:['#3a2b4d','#b5654a'], floor:'#3c4350', floorDark:'#2a303c', line:'#e6c44a' },
+    night:  { id:'night',  name:'星空の下',  emoji:'🌙', price:12000, sky:['#0a1230','#1b2348'], floor:'#222e44', floorDark:'#16202f', line:'#3a4a6b' }
+};
+
+const EXAMS = [
+    { id:'ex1', title:'5級: 前跳び10回', desc:'基本。前跳びを連続10回成功させよ。', reward:600, check:(c,t)=>c>=10 },
+    { id:'ex2', title:'4級: 交差への誘い', desc:'交差・あや跳びを累計3回含む、連続15回を達成。', reward:1800, check:(c,t)=>c>=15 && t.filter(x=>x.includes('交差')||x.includes('あや')).length>=3 },
+    { id:'ex3', title:'3級: 滞空の境地', desc:'二重跳びを1回成功させよ。（跳躍力と腕力が必要）', reward:5000, check:(c,t)=>t.includes('二重跳び') },
+    { id:'ex4', title:'2級: あや跳びマニア', desc:'あや跳びを連続で5回成功させよ。', reward:9000, check:(c,t)=>t.slice(-5).every(x=>x==='あや跳び')&&t.length>=5 },
+    { id:'ex5', title:'1級: 重力からの解放', desc:'三重跳び系、または二重交差跳びを成功させよ。', reward:22000, check:(c,t)=>t.some(x=>['三重跳び','つばめ(三重あや)','三重交差跳び','二重交差跳び'].includes(x)) }
+];
+
+const RANKS = [
+    { m:0,n:'見習い' }, { m:100,n:'初心者' }, { m:400,n:'前跳び名人' },
+    { m:1000,n:'校庭の星' }, { m:3000,n:'縄の求道者' }, { m:8000,n:'師範代' },
+    { m:20000,n:'達人' }, { m:50000,n:'マスター' }
+];
+function getRank(j){ return [...RANKS].reverse().find(r=>j>=r.m).n; }
+
+function getCost(type, lv) {
+    if (lv >= 10) return Infinity;
+    if (type === 'jump')  return Math.floor(250 * Math.pow(1.6, lv - 1));
+    if (type === 'arm')   return Math.floor(200 * Math.pow(1.6, lv - 1));
+    return Math.floor(150 * Math.pow(1.55, lv - 1));
+}
+
+function loadGame() {
+    const s = localStorage.getItem(SAVE_KEY);
+    if (s) {
+        try {
+            const p = JSON.parse(s);
+            save = { ...DEFAULT_SAVE, ...p, physical:{ ...DEFAULT_SAVE.physical, ...(p.physical||{}) } };
+            if (!save.unlockedRopes.includes('vinyl')) save.unlockedRopes = ['vinyl'];
+            if (!Array.isArray(save.unlockedStages) || !save.unlockedStages.includes('gym')) save.unlockedStages = ['gym', ...(Array.isArray(save.unlockedStages)?save.unlockedStages.filter(x=>x!=='gym'):[])];
+            if (!STAGES[save.equippedStage]) save.equippedStage = 'gym';
+        } catch(e) {}
+    }
+    updateAssistBtn();
+    updateUI();
+}
+function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); updateUI(); }
+function confirmReset() {
+    showModal("データの初期化", "全ての特訓記録（Jumps、強化レベル、ロープ、検定）をリセットして、最初からやり直しますか？", true, () => {
+        localStorage.removeItem(SAVE_KEY);
+        save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+        stopGame(); updateAssistBtn(); saveGame(); renderShop(); renderStages(); renderExams();
+    });
+}
+
+// ==========================================
+// 🎮 ゲームステート管理
+// ==========================================
+let gameState = 'IDLE';
+let lastMode = 'PRACTICE', lastExamId = null, currentExam = null;
+let currentCombo = 0, recentTricks = [];
+let maxStamina = 140, stamina = 140;
+let recoverEndTime = 0; // 休憩終了時刻（ミリ秒）
+let tutorialHintLeft = 0; // 初回チュートリアル：あと何回ヒント表示するか
+
+function setStatus(text, colorKey) {
+    document.getElementById('trick-desc').innerText = text;
+    const colors = { slate:"text-slate-400", emerald:"text-emerald-400", red:"text-red-400", cyan:"text-cyan-400", yellow:"text-yellow-400", gold:"text-yellow-300" };
+    document.getElementById('trick-desc').className = `text-[10px] mt-0.5 font-bold ${colors[colorKey]||'text-slate-400'}`;
+}
+
+function toggleAssist() { save.assist = !save.assist; updateAssistBtn(); saveGame(); }
+function updateAssistBtn() {
+    const b = document.getElementById('assist-btn');
+    if (save.assist) {
+        b.innerText = "🧸 アシスト: ON";
+        b.className = "control-btn bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold py-1 px-3 rounded transition-all";
+    } else {
+        b.innerText = "🧸 アシスト: OFF";
+        b.className = "control-btn bg-slate-700 hover:bg-cyan-700 text-slate-200 text-[10px] font-bold py-1 px-3 rounded transition-all";
+    }
+}
+
+function startGame(mode, examId = null) {
+    initAudio();
+    gameState = mode;
+    currentExam = examId ? EXAMS.find(e=>e.id===examId) : null;
+    lastMode = mode; lastExamId = examId;
+    currentCombo = 0; recentTricks = [];
+    stamina = maxStamina = 140 + (save.physical.staminaLevel - 1) * 30;
+
+    if (!save.seenTutorial && mode === 'PRACTICE') { tutorialHintLeft = 8; save.seenTutorial = true; saveGame(); }
+
+    document.getElementById('idle-overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('exhausted-overlay').classList.add('opacity-0', 'pointer-events-none');
+    const badge = document.getElementById('mode-badge');
+    badge.innerText = mode === 'PRACTICE' ? 'FREE PRACTICE' : `EXAM: ${currentExam.title}`;
+    badge.className = `text-[9px] font-bold px-2 py-0.5 rounded absolute top-2 left-1/2 -translate-x-1/2 ${mode==='PRACTICE'?'bg-emerald-900 text-emerald-300':'bg-red-900 text-red-300'}`;
+    document.getElementById('trick-name').innerText = "JUMP!";
+    setStatus("緑のタイミングで「回す」！", "slate");
+
+    document.getElementById('stop-btn').disabled = false;
+    document.getElementById('stop-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+    document.getElementById('touch-spin-btn').classList.remove('opacity-50', 'pointer-events-none');
+    document.getElementById('touch-cross-btn').classList.remove('opacity-50', 'pointer-events-none');
+
+    player.jumpAngle = 0; player.isGrounded = true;
+    rope.angle = 0; rope.isSpinning = false;
+    currentRots = []; firstPressAngle = null; crossStreak = 0;
+}
+
+function stopGame() {
+    gameState = 'IDLE';
+    currentExam = null;
+    player.jumpAngle = 0; rope.angle = 0; rope.isSpinning = false;
+    document.getElementById('idle-overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('exhausted-overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('howto-box').classList.add('hidden');
+    document.getElementById('mode-badge').innerText = 'IDLE';
+    document.getElementById('mode-badge').className = 'text-[9px] font-bold px-2 py-0.5 rounded absolute top-2 left-1/2 -translate-x-1/2 bg-slate-800 text-slate-400';
+    document.getElementById('trick-name').innerText = "READY";
+    setStatus("練習を停止しました", "slate");
+    document.getElementById('stop-btn').disabled = true;
+    document.getElementById('stop-btn').classList.add('opacity-50', 'cursor-not-allowed');
+    document.getElementById('touch-spin-btn').classList.add('opacity-50', 'pointer-events-none');
+    document.getElementById('touch-cross-btn').classList.add('opacity-50', 'pointer-events-none');
+    keys.Shift = false;
+}
+
+function triggerExhaust() {
+    gameState = 'EXHAUSTED';
+    rope.isSpinning = false; rope.angle = 0;
+    playFail(); addShake(8, 16);
+    const recoverSec = (save.physical.staminaLevel >= 10) ? 10 : 15;
+    recoverEndTime = Date.now() + recoverSec * 1000;
+    const ov = document.getElementById('exhausted-overlay');
+    ov.classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('exhausted-emoji').innerText = "🥵";
+    document.getElementById('exhausted-emoji').classList.add('animate-bounce');
+    document.getElementById('exhausted-title').innerText = "息切れ！";
+    document.getElementById('exhausted-title').className = "text-2xl font-black text-red-400 drop-shadow-md";
+    document.getElementById('exhausted-desc').innerHTML = "スタミナが尽きました。<br>少し休めばすぐ回復します。";
+    document.getElementById('recovery-counter').classList.remove('hidden');
+    document.getElementById('resume-btn').classList.add('hidden');
+    setStatus("スタミナ切れ...", "red");
+    document.getElementById('touch-spin-btn').classList.add('opacity-50', 'pointer-events-none');
+    document.getElementById('touch-cross-btn').classList.add('opacity-50', 'pointer-events-none');
+}
+function resumeGame() {
+    document.getElementById('exhausted-overlay').classList.add('opacity-0', 'pointer-events-none');
+    startGame(lastMode, lastExamId);
+}
+
+// ==========================================
+// 🎨 UI更新関数
+// ==========================================
+function switchTab(t) {
+    const bTr=document.getElementById('tab-btn-training'), bEx=document.getElementById('tab-btn-exams');
+    const cTr=document.getElementById('tab-content-training'), cEx=document.getElementById('tab-content-exams');
+    const active="flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all bg-emerald-500 text-slate-950";
+    const idle="flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800";
+    if (t==='training'){ bTr.className=active; bEx.className=idle; cTr.classList.remove('hidden'); cEx.classList.add('hidden'); }
+    else { bEx.className=active; bTr.className=idle; cEx.classList.remove('hidden'); cTr.classList.add('hidden'); }
+}
+function buyUpgrade(type) {
+    const cost = getCost(type, save.physical[`${type}Level`]);
+    if (save.physical[`${type}Level`] >= 10) return showModal("強化完了", "このステータスは既に最大レベルです！");
+    if (save.totalJumps >= cost) {
+        save.totalJumps -= cost; save.physical[`${type}Level`]++;
+        if (type === 'stamina') { maxStamina = 140 + (save.physical.staminaLevel - 1) * 30; stamina = maxStamina; }
+        playSuccess(2, true); saveGame();
+    } else showModal("Jumps不足", "Jumpsが足りません！もっと練習して稼ぎましょう。");
+}
+function buyRope(id) {
+    const r = ROPES[id];
+    if (save.unlockedRopes.includes(id)) { save.equippedRope = id; playSuccess(1); saveGame(); renderShop(); }
+    else if (save.totalJumps >= r.price) {
+        save.totalJumps -= r.price; save.unlockedRopes.push(id); save.equippedRope = id;
+        playSuccess(3, true); saveGame(); renderShop();
+    } else showModal("Jumps不足", "Jumpsが足りません！もっと練習して稼ぎましょう。");
+}
+function renderShop() {
+    let h = '';
+    Object.values(ROPES).forEach(r => {
+        const u = save.unlockedRopes.includes(r.id), e = save.equippedRope === r.id;
+        const btn = e ? `<span class="bg-emerald-900/50 text-emerald-400 text-[10px] font-bold border border-emerald-700 px-2 py-1 rounded">装備中</span>` :
+                    u ? `<button onclick="buyRope('${r.id}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded transition-all">切替</button>` :
+                        `<button onclick="buyRope('${r.id}')" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 text-[10px] font-bold px-2 py-1 rounded flex flex-col items-center"><span>購入</span><span class="text-[8px] opacity-80">${r.price} J</span></button>`;
+        h += `<div class="flex items-center justify-between p-2 rounded-lg border ${e?'border-emerald-600 bg-slate-900':'border-slate-800 bg-slate-950'}">
+                <div class="flex items-center space-x-2"><span class="text-xl">${r.emoji}</span>
+                    <div><div class="font-bold text-[11px] text-white">${r.name}</div>
+                    <div class="text-[9px] text-slate-500 flex space-x-2 mt-0.5"><span>速:${r.baseSpin}</span><span>重:${r.weightCost}</span><span>獲:x${r.mult}</span></div></div>
+                </div><div>${btn}</div></div>`;
+    });
+    document.getElementById('rope-shop-list').innerHTML = h;
+}
+function buyStage(id) {
+    const s = STAGES[id];
+    if (save.unlockedStages.includes(id)) { save.equippedStage = id; playSuccess(1); saveGame(); renderStages(); }
+    else if (save.totalJumps >= s.price) {
+        save.totalJumps -= s.price; save.unlockedStages.push(id); save.equippedStage = id;
+        playSuccess(3, true); saveGame(); renderStages();
+    } else showModal("Jumps不足", "Jumpsが足りません！もっと練習して稼ぎましょう。");
+}
+function renderStages() {
+    let h = '';
+    Object.values(STAGES).forEach(s => {
+        const u = save.unlockedStages.includes(s.id), e = save.equippedStage === s.id;
+        const sw = `<span class="inline-block w-3 h-3 rounded-sm border border-slate-600 align-middle" style="background:linear-gradient(${s.sky[0]},${s.sky[1]})"></span>`;
+        const btn = e ? `<span class="bg-emerald-900/50 text-emerald-400 text-[10px] font-bold border border-emerald-700 px-2 py-1 rounded">使用中</span>` :
+                    u ? `<button onclick="buyStage('${s.id}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded transition-all">選択</button>` :
+                        `<button onclick="buyStage('${s.id}')" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 text-[10px] font-bold px-2 py-1 rounded flex flex-col items-center"><span>解放</span><span class="text-[8px] opacity-80">${s.price} J</span></button>`;
+        h += `<div class="flex items-center justify-between p-2 rounded-lg border ${e?'border-emerald-600 bg-slate-900':'border-slate-800 bg-slate-950'}">
+                <div class="flex items-center space-x-2"><span class="text-xl">${s.emoji}</span>
+                    <div><div class="font-bold text-[11px] text-white">${s.name} ${sw}</div>
+                    <div class="text-[9px] text-slate-500 mt-0.5">${u?'解放済み':'未解放'}</div></div>
+                </div><div>${btn}</div></div>`;
+    });
+    document.getElementById('stage-list').innerHTML = h;
+}
+function renderExams() {
+    let h = '';
+    EXAMS.forEach(e => {
+        const p = save.passedExams.includes(e.id);
+        const b = p ? `<span class="bg-emerald-900/50 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-700">💮 合格</span>` :
+                      `<button onclick="startGame('EXAM', '${e.id}')" class="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded transition-all shadow-md">挑戦する</button>`;
+        h += `<div class="p-3 rounded-lg border ${p?'border-emerald-900 bg-emerald-950/20':'border-slate-800 bg-slate-950'}">
+                <div class="flex justify-between items-start mb-1"><h4 class="font-bold text-xs text-white">${e.title}</h4>${b}</div>
+                <p class="text-[10px] text-slate-400 mb-1.5">${e.desc}</p>
+                <div class="text-[9px] text-slate-500">報酬: <span class="text-yellow-400 font-bold">${e.reward} Jumps</span></div></div>`;
+    });
+    document.getElementById('exam-list').innerHTML = h;
+}
+function updateUI() {
+    document.getElementById("total-jumps-display").innerText = save.totalJumps.toLocaleString();
+    const cd = document.getElementById("combo-display");
+    cd.innerText = currentCombo;
+    document.getElementById("best-combo-display").innerText = save.highCombo;
+    document.getElementById("rank-display").innerText = getRank(save.lifetimeJumps);
+    ['jump','arm','stamina'].forEach(t => {
+        const lv = save.physical[`${t}Level`];
+        document.getElementById(`${t}-lv`).innerText = lv;
+        const cost = getCost(t, lv);
+        document.getElementById(`${t}-cost`).innerText = cost === Infinity ? 'MAX' : `${cost} J`;
+        document.getElementById(`upgrade-${t}-btn`).classList.toggle("opacity-50", save.totalJumps < cost || lv >= 10);
+    });
+}
+function comboPulse() {
+    const cd = document.getElementById("combo-display");
+    cd.classList.remove('pop'); void cd.offsetWidth; cd.classList.add('pop');
+}
+
+// ==========================================
+// 🏃 物理演算＆入力制御
+// ==========================================
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const VW = 700, VH = 393.75;
+let viewScale = 1;
+function resize() {
+    const r = canvas.getBoundingClientRect(); if(r.width===0)return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = r.width*dpr; canvas.height = r.height*dpr;
+    viewScale = (r.width*dpr)/VW;
+}
+window.addEventListener('resize', resize);
+
+const player = {
+    x: 250, y: 220, baseY: 220, w: 32, h: 70, jumpAngle: 0,
+    isGrounded: true, isKneeling: false, kneelTimer: 0, prepProg: 0,
+    getHeight: () => 40 + (save.physical.jumpLevel * 8),
+    // 1周期あたりの進む角度（小さいほど滞空が長い）。アシスト時は更にゆっくり＝猶予UP
+    getSpeed: () => (5.1 - (save.physical.jumpLevel * 0.14)) * (save.assist ? 0.82 : 1)
+};
+const rope = {
+    angle: 0, isSpinning: false, isCrossed: false,
+    getSpeed: () => ROPES[save.equippedRope].baseSpin * (0.80 + (save.physical.armLevel * 0.11)) * crossFactor(),
+    getCost: () => {
+        const drainMult = 1 - (save.physical.staminaLevel - 1) * 0.04;
+        const crossExtra = rope.isCrossed ? 1.25 : 1; // 交差は消耗が大きい
+        return ROPES[save.equippedRope].weightCost * 0.6 * drainMult * crossExtra * (save.assist ? 0.5 : 1);
+    }
+};
+// 交差は腕を組むぶん縄が遅くなる。連続で交差し続けるとさらに失速（疲労）。
+let crossStreak = 0; // 連続「全交差」ジャンプ数
+function crossFactor() {
+    if (!rope.isCrossed) return 1;
+    let f = 0.72;
+    if (crossStreak >= 3) f -= Math.min((crossStreak - 2) * 0.045, 0.18);
+    return Math.max(0.5, f);
+}
+// レベルに応じた見た目（跳躍=色味/腕力=ヘッドバンド・リスト/持久=マント、合計でオーラ・冠）
+function getCharStyle() {
+    const jL = save.physical.jumpLevel, aL = save.physical.armLevel, sL = save.physical.staminaLevel;
+    const power = jL + aL + sL; // 3..30
+    let outfit, outfitDark, hair = "#ea580c", accent = "#22d3ee";
+    if (power >= 28)      { outfit="#fbbf24"; outfitDark="#b45309"; hair="#fde047"; accent="#f472b6"; }
+    else if (power >= 22) { outfit="#a855f7"; outfitDark="#6b21a8"; hair="#f0abfc"; accent="#facc15"; }
+    else if (power >= 15) { outfit="#3b82f6"; outfitDark="#1e3a8a"; hair="#ea580c"; accent="#22d3ee"; }
+    else if (power >= 8)  { outfit="#10b981"; outfitDark="#065f46"; hair="#ea580c"; accent="#fde047"; }
+    else                  { outfit="#059669"; outfitDark="#334155"; hair="#ea580c"; accent="#94a3b8"; }
+    return { power, jL, aL, sL, outfit, outfitDark, hair, accent,
+        headband: aL>=4, wrist: aL>=7, cape: sL>=6, capeBig: sL>=10, aura: power>=22, crown: power>=28 };
+}
+let currentRots = [];
+const keys = { Shift: false };
+let touchCross = false;
+let firstPressAngle = null; // このジャンプで最初に回した瞬間の角度（判定用）
+
+const btnS = document.getElementById('touch-spin-btn');
+const btnC = document.getElementById('touch-cross-btn');
+btnS.addEventListener('pointerdown', e => { e.preventDefault(); handleSpin(); });
+btnC.addEventListener('pointerdown', e => {
+    if (gameState !== 'PRACTICE' && gameState !== 'EXAM') return;
+    e.preventDefault();
+    touchCross = !touchCross; keys.Shift = touchCross;
+    document.getElementById('touch-cross-text').innerText = touchCross ? "🙅 交差" : "🙆 通常";
+    if (touchCross) {
+        btnC.classList.remove('bg-amber-500','text-slate-950','active:shadow-[0_0px_0_#d97706]','shadow-[0_4px_0_#d97706]','active:bg-amber-400','hover:bg-amber-400');
+        btnC.classList.add('bg-red-500','text-white','active:shadow-[0_0px_0_#b91c1c]','shadow-[0_4px_0_#b91c1c]','active:bg-red-400','hover:bg-red-400');
+    } else {
+        btnC.classList.add('bg-amber-500','text-slate-950','active:shadow-[0_0px_0_#d97706]','shadow-[0_4px_0_#d97706]','active:bg-amber-400','hover:bg-amber-400');
+        btnC.classList.remove('bg-red-500','text-white','active:shadow-[0_0px_0_#b91c1c]','shadow-[0_4px_0_#b91c1c]','active:bg-red-400','hover:bg-red-400');
+    }
+});
+
+// 押すべきタイミングの窓（ジャンプ角度ベース）
+function getPressWindow() {
+    const ps = player.getSpeed();
+    const ropeFrames = 360 / rope.getSpeed();
+    let latest = 180 - ropeFrames * ps;     // これより遅いと着地までに回し切れない
+    if (save.assist) latest *= 1.3;
+    latest = Math.max(24, Math.min(latest, 176));
+    return { perfectEnd: latest * 0.6, goodEnd: latest };
+}
+
+function handleSpin() {
+    if (gameState !== 'PRACTICE' && gameState !== 'EXAM') return;
+    if (freezeFrames > 0) return;
+    initAudio();
+    // 多重跳び用：回転終盤に再度押すと、その回転を確定して次を即開始
+    if (rope.isSpinning && rope.angle > 250) {
+        if (!completeRotation()) return;
+        rope.angle = 0; rope.isSpinning = false;
+    }
+    if (!rope.isSpinning) {
+        rope.isSpinning = true; rope.angle = 1;
+        if (firstPressAngle === null) firstPressAngle = player.jumpAngle;
+        playSwoosh(rope.getSpeed() / 20);
+        stamina -= rope.getCost();
+        spawnSpark(player.x, player.y + 30, ROPES[save.equippedRope].color, 4, 1.5);
+        if (stamina <= 0) triggerExhaust();
+    }
+}
+window.addEventListener("keydown", e => {
+    if (e.code === "Space" && !e.repeat) { e.preventDefault(); handleSpin(); }
+    if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.Shift = true;
+});
+window.addEventListener("keyup", e => {
+    if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.Shift = touchCross;
+});
+
+function completeRotation() {
+    if (player.isGrounded) { fail(); return false; }
+    // 連続交差が続くと、まれに腕が絡まって失敗
+    if (rope.isCrossed && crossStreak >= 3 && Math.random() < Math.min((crossStreak - 2) * 0.03, 0.12)) {
+        addFloater(player.x, player.y - 26, "腕が絡まった！", "#f87171", 18);
+        crossStreak = 0; fail(); return false;
+    }
+    currentRots.push(rope.isCrossed);
+    return true;
+}
+function fail() {
+    playFail(); addShake(7, 14); crossStreak = 0;
+    spawnSpark(player.x, player.baseY + 40, '#ef4444', 18, 3);
+    addFloater(player.x, player.y - 10, "ひっかかった！", "#f87171", 22);
+    setStatus("引っかかった！タイミングが遅すぎ", "red");
+    document.getElementById('trick-name').innerText = "FAIL";
+    if (gameState === 'EXAM') {
+        setTimeout(() => { showModal("検定不合格...", "足に引っかかりました。緑ゾーンの真ん中を狙って再挑戦！"); stopGame(); }, 300);
+    } else {
+        currentCombo = 0; currentRots = []; recentTricks = []; firstPressAngle = null;
+        updateUI();
+    }
+}
+function getTrick(rots) {
+    if (!rots.length) return null;
+    const c = rots.length, x = rots.filter(r=>r).length;
+    if (c===1) return x===1 ? "交差跳び" : "前跳び";
+    if (c===2) return x===2 ? "二重交差跳び" : x===1 ? "はやぶさ(あや二重)" : "二重跳び";
+    if (c===3) return x>=2 ? "三重交差跳び" : x===1 ? "つばめ(三重あや)" : "三重跳び";
+    return `${c}重跳び`;
+}
+function getMult(t) {
+    if (t==="前跳び") return 5;
+    if (t==="あや跳び" || t==="交差跳び") return 8;
+    if (t==="二重跳び") return 20;
+    if (t==="はやぶさ(あや二重)") return 32;
+    if (t==="二重交差跳び") return 45;
+    if (t==="三重跳び") return 55;
+    if (t==="つばめ(三重あや)") return 75;
+    if (t==="三重交差跳び") return 110;
+    return 130;
+}
+
+// ==========================================
+// ✨ 演出システム（パーティクル・浮き文字・画面揺れ・ヒットストップ）
+// ==========================================
+let particles = [], floaters = [];
+let shake = { t:0, mag:0 };
+let freezeFrames = 0;
+let flashAlpha = 0;
+let rHue = 0;
+
+function addShake(mag, t){ shake.mag = Math.max(shake.mag, mag); shake.t = Math.max(shake.t, t); }
+function spawnSpark(x, y, color, n, power){
+    for(let i=0;i<n;i++){
+        if(particles.length>140) break;
+        const a = Math.random()*Math.PI*2, sp = (0.6+Math.random()*1.4)*power;
+        particles.push({ x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - power*0.6, life:1, size:1.5+Math.random()*2.5,
+            color: color==='rainbow' ? `hsl(${Math.random()*360},90%,60%)` : color });
+    }
+}
+function spawnDust(x,y){
+    for(let i=0;i<6;i++){
+        if(particles.length>140) break;
+        particles.push({ x:x+(Math.random()*20-10), y, vx:(Math.random()*2-1)*1.2, vy:-Math.random()*0.8, life:0.7, size:2+Math.random()*2, color:'#64748b' });
+    }
+}
+function addFloater(x, y, text, color, size){
+    floaters.push({ x, y, vy:-0.9, life:1, text, color, size });
+    if(floaters.length>14) floaters.shift();
+}
+function updateEffects(){
+    for(let i=particles.length-1;i>=0;i--){
+        const p=particles[i];
+        p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.vx*=0.96; p.life-=0.03;
+        if(p.life<=0) particles.splice(i,1);
+    }
+    for(let i=floaters.length-1;i>=0;i--){
+        const f=floaters[i];
+        f.y+=f.vy; f.vy*=0.94; f.life-=0.018;
+        if(f.life<=0) floaters.splice(i,1);
+    }
+    if(shake.t>0) shake.t--;
+    if(flashAlpha>0) flashAlpha-=0.08;
+}
+function drawEffects(){
+    particles.forEach(p=>{
+        ctx.globalAlpha = Math.max(0,p.life);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    floaters.forEach(f=>{
+        ctx.globalAlpha = Math.max(0, Math.min(1, f.life*1.4));
+        ctx.font = `900 ${f.size}px 'Noto Sans JP', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(2,6,23,0.85)';
+        ctx.strokeText(f.text, f.x, f.y);
+        ctx.fillStyle = f.color;
+        ctx.fillText(f.text, f.x, f.y);
+    });
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+}
+
+// ==========================================
+// 🎨 レンダリング・ループ
+// ==========================================
+function loop() {
+    updateEffects();
+
+    ctx.setTransform(viewScale, 0, 0, viewScale, 0, 0);
+    // 画面揺れ
+    let ox=0, oy=0;
+    if (shake.t>0){ const m=shake.mag*(shake.t/14); ox=(Math.random()*2-1)*m; oy=(Math.random()*2-1)*m; }
+    ctx.save(); ctx.translate(ox, oy);
+    ctx.clearRect(-20, -20, VW+40, VH+40);
+    rHue = (rHue + 2) % 360;
+
+    // --- 背景・床（ステージ別） ---
+    const gY = player.baseY + player.h - 5;
+    drawStage(STAGES[save.equippedStage] || STAGES.gym, gY);
+
+    // --- 物理更新（ヒットストップ中は止める） ---
+    const physicsActive = (gameState==='PRACTICE'||gameState==='EXAM') && freezeFrames===0;
+    if (freezeFrames>0) freezeFrames--;
+
+    if (gameState === 'IDLE') {
+        stamina = Math.min(maxStamina, stamina + 0.8);
+    } else if (gameState === 'EXHAUSTED') {
+        const remainMs = recoverEndTime - Date.now();
+        if (remainMs > 0) {
+            // 残り時間に応じてスタミナバーも徐々に回復（演出）
+            const total = (save.physical.staminaLevel >= 10 ? 10 : 15) * 1000;
+            stamina = maxStamina * (1 - remainMs / total);
+            document.getElementById('recovery-counter').innerText = `${Math.ceil(remainMs/1000)} 秒`;
+        } else {
+            stamina = maxStamina; gameState = 'RECOVERED';
+            document.getElementById('recovery-counter').classList.add('hidden');
+            document.getElementById('exhausted-emoji').innerText = "✨";
+            document.getElementById('exhausted-emoji').classList.remove('animate-bounce');
+            document.getElementById('exhausted-title').innerText = "回復完了！";
+            document.getElementById('exhausted-title').className = "text-2xl font-black text-emerald-400 drop-shadow-md";
+            document.getElementById('exhausted-desc').innerHTML = "スタミナが全回復しました。<br>いつでも再開できます。";
+            document.getElementById('resume-btn').classList.remove('hidden');
+            setStatus("回復完了。再開できます", "emerald");
+        }
+    } else if (gameState === 'RECOVERED') {
+        stamina = maxStamina;
+    } else if (physicsActive) {
+        player.jumpAngle += player.getSpeed();
+        stamina -= 0.03 * (save.assist ? 0.5 : 1);
+        if (stamina <= 0) triggerExhaust();
+
+        if (player.jumpAngle >= 360) {
+            player.jumpAngle = 0;
+            if (currentRots.length > 0) {
+                let tn = getTrick(currentRots);
+                currentCombo++;
+                if (recentTricks.length && ((tn==="交差跳び"&&recentTricks.slice(-1)[0]==="前跳び")||(tn==="前跳び"&&recentTricks.slice(-1)[0]==="交差跳び"))) tn="あや跳び";
+                recentTricks.push(tn); if(recentTricks.length>20) recentTricks.shift();
+
+                // 連続「全交差」の疲労カウント（開いた回転が混ざればリセット）
+                if (currentRots.length > 0 && currentRots.every(r=>r)) crossStreak++; else crossStreak = 0;
+
+                // タイミング判定
+                const win = getPressWindow();
+                let timing = "GOOD", tmult = 1.0;
+                if (firstPressAngle !== null) {
+                    if (firstPressAngle <= win.perfectEnd) { timing="PERFECT"; tmult=1.6; }
+                    else if (firstPressAngle <= win.goodEnd) { timing="GOOD"; tmult=1.0; }
+                    else { timing="GOOD"; tmult=0.9; }
+                }
+                const rots = currentRots.length;
+
+                if (gameState === 'PRACTICE') {
+                    const comboBonus = 1 + Math.min(currentCombo,100)*0.03;
+                    const gain = Math.round(getMult(tn) * ROPES[save.equippedRope].mult * comboBonus * tmult);
+                    save.totalJumps += gain;
+                    addFloater(player.x+30, player.y, `+${gain}`, "#fde047", 18);
+                }
+                save.lifetimeJumps += rots;
+                if (currentCombo > save.highCombo) save.highCombo = currentCombo;
+
+                // 演出
+                const isBig = rots >= 2;
+                const col = ROPES[save.equippedRope].color;
+                spawnSpark(player.x, player.y, col, 8 + rots*8, 2 + rots*0.8);
+                if (timing==="PERFECT") { addFloater(player.x, player.y-30, "PERFECT!", "#34d399", 18); flashAlpha=0.25; }
+                addFloater(player.x, player.y-(timing==="PERFECT"?52:30), tn, isBig?"#22d3ee":"#fbbf24", isBig?22:16);
+                if (isBig) { addShake(4+rots*2, 10); freezeFrames = 3 + rots*2; flashAlpha=Math.max(flashAlpha,0.3); }
+                playSuccess(rots, timing==="PERFECT");
+                if (currentCombo>0 && currentCombo%10===0) addFloater(player.x, player.y-70, `${currentCombo} COMBO!`, "#a78bfa", 20);
+
+                document.getElementById('trick-name').innerText = tn;
+                setStatus(`COMBO ${currentCombo}！ ${timing}`, timing==="PERFECT"?"emerald":"yellow");
+                comboPulse();
+                if (tutorialHintLeft>0) tutorialHintLeft--;
+                saveGame();
+
+                if (gameState === 'EXAM' && currentExam.check(currentCombo, recentTricks)) {
+                    const passed = currentExam;
+                    save.passedExams.push(passed.id);
+                    save.totalJumps += passed.reward;
+                    playCoin(); addFloater(player.x, player.y-20, "検定合格!", "#34d399", 24); flashAlpha=0.4;
+                    stopGame(); saveGame(); renderExams();
+                    setTimeout(() => openShareModal(`💮 ${passed.title} 合格！`), 350);
+                }
+            }
+            currentRots = []; firstPressAngle = null;
+        }
+
+        const rad = (player.jumpAngle*Math.PI)/180;
+        if (player.jumpAngle>0 && player.jumpAngle<180) {
+            player.y = player.baseY - Math.sin(rad)*player.getHeight();
+            player.isGrounded = false; player.isKneeling = false;
+            player.prepProg = 0;
+        } else {
+            // 接地中＝予備動作（しゃがんでため、踏み切りへ）
+            player.prepProg = Math.max(0, Math.min(1, (player.jumpAngle - 180) / 180));
+            player.y = player.baseY;
+            if (!player.isGrounded) { player.isGrounded=true; player.isKneeling=true; player.kneelTimer=6; spawnDust(player.x, gY); }
+            if (player.isKneeling) if (--player.kneelTimer<=0) player.isKneeling=false;
+        }
+
+        rope.isCrossed = keys.Shift;
+        if (rope.isSpinning) {
+            const pA = rope.angle; rope.angle += rope.getSpeed();
+            if (pA<360 && rope.angle>=360) { rope.angle=0; rope.isSpinning=false; completeRotation(); }
+        }
+    }
+
+    // --- キャラクター描画 ---
+    const jH = player.baseY - player.y;
+    const sS = Math.max(0.3, 1-(jH/100)), sA = Math.max(0.1, 0.5-(jH/150));
+    ctx.fillStyle = `rgba(0,0,0,${sA})`; ctx.beginPath(); ctx.ellipse(player.x, gY+2, 22*sS, 5*sS, 0, 0, Math.PI*2); ctx.fill();
+
+    // 縄の残像（後ろ側を先に薄く）
+    drawRope(true);
+
+    ctx.save(); ctx.translate(player.x, player.y);
+    if (!player.isGrounded) {
+        const sY = 1 + Math.sin(player.jumpAngle*Math.PI/180)*0.08;
+        ctx.scale(1, sY);
+    } else {
+        // 予備動作：足は地面に固定し、頭だけ沈む（足元を中心に縦圧縮）
+        const dip = Math.sin((player.prepProg||0) * Math.PI); // 0→1→0
+        const squash = Math.max(dip*0.22, player.isKneeling?0.16:0);
+        const feetLocalY = 70; // 足元のローカルY
+        ctx.translate(0, feetLocalY); ctx.scale(1 + squash*0.45, 1 - squash); ctx.translate(0, -feetLocalY);
+    }
+    const cs = getCharStyle();
+    const tO = !player.isGrounded ? Math.sin((player.jumpAngle*Math.PI/180)*2)*6 : 0;
+
+    // オーラ（高レベル）
+    if (cs.aura) {
+        ctx.save();
+        ctx.globalAlpha = 0.22 + (!player.isGrounded ? 0.16 : 0);
+        ctx.shadowColor = cs.outfit; ctx.shadowBlur = 20; ctx.fillStyle = cs.outfit;
+        ctx.beginPath(); ctx.arc(0, 32, 27, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+    // マント（持久力）
+    if (cs.cape) {
+        const sway = (!player.isGrounded ? Math.sin(player.jumpAngle*Math.PI/180*2)*5 : 0);
+        const len = cs.capeBig ? 48 : 36;
+        ctx.fillStyle = cs.accent; ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(-9,17); ctx.lineTo(9,17);
+        ctx.lineTo(13+sway,17+len); ctx.lineTo(0+sway*0.5,17+len-7); ctx.lineTo(-13+sway,17+len);
+        ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+    }
+
+    // 胴体
+    ctx.fillStyle = player.isGrounded ? cs.outfitDark : cs.outfit;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-12,16,24,40,6) : ctx.fillRect(-12,16,24,40); ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0,16); ctx.lineTo(0,56); ctx.stroke();
+    ctx.fillStyle = "#1e293b";
+    if (player.isGrounded) {
+        ctx.fillRect(-9,52,7,18); ctx.fillRect(2,52,7,18);
+        ctx.fillStyle="#f8fafc"; ctx.fillRect(-10,66,10,5); ctx.fillRect(1,66,10,5);
+    } else {
+        ctx.fillRect(-9,52,7,12); ctx.fillRect(2,52,7,10);
+        ctx.fillStyle="#f8fafc"; ctx.fillRect(-8,62,10,5); ctx.fillRect(3,60,10,5);
+    }
+    // 頭・髪
+    ctx.fillStyle = "#fde68a"; ctx.beginPath(); ctx.arc(0,2,12,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = cs.hair; ctx.beginPath(); ctx.arc(0,-2,13,Math.PI,0); ctx.fill(); ctx.fillRect(-13,-2,26,6);
+    // 冠（最高位）
+    if (cs.crown) {
+        ctx.fillStyle = "#fde047";
+        ctx.beginPath();
+        ctx.moveTo(-9,-11); ctx.lineTo(-6,-19); ctx.lineTo(-3,-12);
+        ctx.lineTo(0,-20); ctx.lineTo(3,-12); ctx.lineTo(6,-19); ctx.lineTo(9,-11);
+        ctx.closePath(); ctx.fill();
+    }
+    // ヘッドバンド（腕力）
+    if (cs.headband) {
+        ctx.fillStyle = cs.accent; ctx.fillRect(-13,-4,26,4);
+        ctx.fillRect(-16,-3,5,9); // 結び目
+    }
+    // 腕
+    ctx.fillStyle = "#fde68a";
+    ctx.beginPath(); ctx.ellipse(-14,4+tO,6,12,Math.PI/6,0,Math.PI*2); ctx.fill();
+    // リストバンド（腕力）
+    if (cs.wrist) { ctx.fillStyle = cs.accent; ctx.fillRect(-20,11+tO,11,4); }
+    ctx.fillStyle = "#0f172a"; ctx.fillRect(5,0,3,4);
+    if (rope.isCrossed) {
+        ctx.strokeStyle="#fde68a"; ctx.lineWidth=5; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(-10,24); ctx.lineTo(14,34); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(10,24); ctx.lineTo(-14,34); ctx.stroke();
+    } else {
+        ctx.fillStyle="#fde68a"; ctx.fillRect(10,24,7,5); ctx.fillRect(-17,24,7,5);
+    }
+    ctx.restore();
+
+    // 縄（手前側）
+    drawRope(false);
+
+    // --- タイミングガイド（押すべき瞬間を可視化） ---
+    if (gameState==='PRACTICE' || gameState==='EXAM') drawVerticalGauge();
+
+    // --- HUD (スタミナバー) ---
+    const bW=160, bH=12, bX=20, bY=VH-30;
+    const lowSt = (stamina/maxStamina) < 0.25;
+    ctx.strokeStyle = lowSt && (Math.floor(Date.now()/150)%2===0) ? "#ef4444" : "#334155";
+    ctx.lineWidth=2; ctx.strokeRect(bX,bY,bW,bH);
+    const sR = stamina/maxStamina;
+    ctx.fillStyle = sR<0.25 ? "#ef4444" : sR<0.5 ? "#f59e0b" : "#10b981";
+    ctx.fillRect(bX+2, bY+2, Math.max(0,(bW-4)*sR), bH-4);
+    ctx.fillStyle="#cbd5e1"; ctx.font="bold 10px 'Orbitron', sans-serif";
+    ctx.fillText(`STAMINA ${Math.floor(sR*100)}%`, bX, bY-6);
+
+    drawEffects();
+
+    // 画面フラッシュ
+    if (flashAlpha>0){ ctx.fillStyle=`rgba(255,255,255,${flashAlpha})`; ctx.fillRect(-20,-20,VW+40,VH+40); }
+
+    ctx.restore();
+    requestAnimationFrame(loop);
+}
+
+// ===== ステージ（背景）描画 =====
+let _stars=null, _buildings=null, _clouds=null;
+function ensureStageAssets(){
+    if(!_stars){ _stars=[]; for(let i=0;i<64;i++) _stars.push({x:Math.random()*VW, y:Math.random()*190, r:Math.random()*1.4+0.4, p:Math.random()*6}); }
+    if(!_buildings){ _buildings=[]; let x=-30; while(x<VW+40){ const w=42+Math.random()*64, h=55+Math.random()*120; _buildings.push({x,w,h}); x+=w+6+Math.random()*12; } }
+    if(!_clouds){ _clouds=[]; for(let i=0;i<3;i++) _clouds.push({x:Math.random()*VW, y:36+Math.random()*64, s:0.7+Math.random()*0.6, v:5+Math.random()*7}); }
+}
+function floorPerspective(gY, color, alpha){
+    ctx.strokeStyle = hexAlpha(color, alpha); ctx.lineWidth = 2;
+    for(let i=-100;i<VW+100;i+=60){ ctx.beginPath(); ctx.moveTo(i,gY); ctx.lineTo(i-120,VH); ctx.stroke(); }
+}
+function drawCloud(x,y,s){
+    ctx.fillStyle="rgba(255,255,255,0.85)";
+    [[0,0,16],[14,4,13],[-14,5,12],[6,-6,11]].forEach(([dx,dy,r])=>{ ctx.beginPath(); ctx.arc(x+dx*s,y+dy*s,r*s,0,Math.PI*2); ctx.fill(); });
+}
+function drawStage(stg, gY){
+    ensureStageAssets();
+    const t = Date.now()/1000;
+    // 空
+    const sky = ctx.createLinearGradient(0,-20,0,gY);
+    sky.addColorStop(0, stg.sky[0]); sky.addColorStop(1, stg.sky[1]);
+    ctx.fillStyle = sky; ctx.fillRect(-20,-20,VW+40,gY+20);
+
+    // 遠景（gYより上）
+    if (stg.id==='gym') {
+        // 高窓
+        ctx.fillStyle="rgba(255,255,255,0.10)";
+        for(let i=60;i<VW-40;i+=120){ ctx.fillRect(i,40,80,46); }
+        ctx.strokeStyle="rgba(0,0,0,0.15)"; ctx.lineWidth=2;
+        for(let i=60;i<VW-40;i+=120){ ctx.strokeRect(i,40,80,46); ctx.beginPath(); ctx.moveTo(i+40,40); ctx.lineTo(i+40,86); ctx.stroke(); }
+        // 肋木（左）と バスケゴール（右）
+        ctx.strokeStyle="rgba(0,0,0,0.18)"; ctx.lineWidth=4; for(let y=110;y<gY-10;y+=18){ ctx.beginPath(); ctx.moveTo(24,y); ctx.lineTo(70,y); ctx.stroke(); }
+        ctx.fillStyle="#475569"; ctx.fillRect(VW-70,120,8,gY-120); // 支柱
+        ctx.fillStyle="#e2e8f0"; ctx.fillRect(VW-110,116,46,30); // バックボード
+        ctx.strokeStyle="#f97316"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(VW-92,150,10,0,Math.PI); ctx.stroke();
+    } else if (stg.id==='ground') {
+        // 太陽
+        ctx.fillStyle="rgba(255,241,200,0.95)"; ctx.beginPath(); ctx.arc(90,70,30,0,Math.PI*2); ctx.fill();
+        // 雲（流れる）
+        _clouds.forEach(c=>{ const x=((c.x + t*c.v) % (VW+120)) - 60; drawCloud(x, c.y, c.s); });
+        // 校舎シルエット＋木
+        ctx.fillStyle="rgba(40,55,75,0.30)"; ctx.fillRect(-20,gY-70,VW*0.55,70);
+        for(let i=10;i<VW*0.55;i+=34){ ctx.fillStyle="rgba(255,255,255,0.12)"; ctx.fillRect(i,gY-58,18,16); ctx.fillRect(i,gY-34,18,16); }
+        ctx.fillStyle="#5b3a1e"; ctx.fillRect(VW-120,gY-46,10,46); ctx.fillStyle="#3f7d3a"; ctx.beginPath(); ctx.arc(VW-115,gY-58,30,0,Math.PI*2); ctx.fill();
+    } else if (stg.id==='street') {
+        // ビル群
+        _buildings.forEach((b,i)=>{ ctx.fillStyle = i%2? "rgba(20,24,38,0.85)":"rgba(30,34,52,0.85)"; ctx.fillRect(b.x, gY-b.h, b.w, b.h);
+            ctx.fillStyle="rgba(250,210,120,0.55)"; for(let wy=gY-b.h+10; wy<gY-12; wy+=16){ for(let wx=b.x+6; wx<b.x+b.w-8; wx+=14){ if((wx+wy)%3) ctx.fillRect(wx,wy,6,8); } } });
+        // 街灯＋光
+        const lx=VW-90; ctx.fillStyle="#1f2937"; ctx.fillRect(lx,gY-150,6,150); ctx.fillRect(lx-22,gY-150,28,6);
+        ctx.fillStyle="rgba(255,224,130,0.9)"; ctx.beginPath(); ctx.arc(lx-22,gY-146,6,0,Math.PI*2); ctx.fill();
+        const lg=ctx.createRadialGradient(lx-22,gY-146,4,lx-22,gY-146,120); lg.addColorStop(0,"rgba(255,224,130,0.22)"); lg.addColorStop(1,"rgba(255,224,130,0)");
+        ctx.fillStyle=lg; ctx.beginPath(); ctx.arc(lx-22,gY-146,120,0,Math.PI*2); ctx.fill();
+    } else if (stg.id==='night') {
+        _stars.forEach(s=>{ const a=0.4+0.6*Math.abs(Math.sin(t*1.2+s.p)); ctx.globalAlpha=a; ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); }); ctx.globalAlpha=1;
+        // 月
+        ctx.fillStyle="#e8edf5"; ctx.beginPath(); ctx.arc(VW-90,70,28,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=stg.sky[0]; ctx.beginPath(); ctx.arc(VW-100,62,24,0,Math.PI*2); ctx.fill();
+        // 遠くの丘
+        ctx.fillStyle="rgba(20,28,46,0.8)"; ctx.beginPath(); ctx.moveTo(-20,gY); ctx.quadraticCurveTo(VW*0.3,gY-60,VW*0.6,gY); ctx.quadraticCurveTo(VW*0.8,gY-40,VW+20,gY); ctx.fill();
+    }
+
+    // 床
+    ctx.fillStyle = stg.floor; ctx.fillRect(-20,gY,VW+40,VH-gY+20);
+    floorPerspective(gY, stg.line, 0.16);
+
+    // 床の模様
+    if (stg.id==='gym') {
+        ctx.strokeStyle=hexAlpha(stg.line,0.55); ctx.lineWidth=3;
+        ctx.beginPath(); ctx.ellipse(VW/2, gY+78, 150, 30, 0, 0, Math.PI*2); ctx.stroke(); // センターサークル
+        ctx.beginPath(); ctx.moveTo(VW/2,gY); ctx.lineTo(VW/2,VH); ctx.stroke();           // センターライン
+    } else if (stg.id==='ground') {
+        ctx.strokeStyle=hexAlpha(stg.line,0.5); ctx.lineWidth=5;
+        for(let k=1;k<=3;k++){ const y=gY+k*26; ctx.beginPath(); ctx.moveTo(-20,y); ctx.lineTo(VW+20,y); ctx.stroke(); } // レーン
+    } else if (stg.id==='street') {
+        ctx.strokeStyle=hexAlpha(stg.line,0.8); ctx.lineWidth=5; ctx.setLineDash([26,22]);
+        ctx.beginPath(); ctx.moveTo(-20,gY+60); ctx.lineTo(VW+20,gY+60); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle="rgba(0,0,0,0.35)"; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(VW*0.25,gY+78,22,8,0,0,Math.PI*2); ctx.stroke(); // マンホール
+    }
+
+    // 地面ライン
+    ctx.strokeStyle = stg.line; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-20,gY); ctx.lineTo(VW+20,gY); ctx.stroke();
+}
+
+// ===== 縄の描画（立体感＋素材別） =====
+function getRopePathPoints(ang, n) {
+    const rRad = (ang*Math.PI)/180;
+    const hX1 = rope.isCrossed ? player.x-12 : player.x+14, hY1 = player.y+32;
+    const hX2 = rope.isCrossed ? player.x+12 : player.x-14, hY2 = player.y+32;
+    const rX = player.x + Math.cos(rRad)*120;
+    const rY = player.y + 30 + Math.sin(rRad)*140;
+    let segs;
+    if (rope.isCrossed) {
+        const cX=player.x, cY=player.y+45;
+        segs = [
+            [hX1,hY1, hX1+Math.cos(rRad)*30,hY1+Math.sin(rRad)*30, cX+Math.sin(rRad)*40,cY-Math.cos(rRad)*40, rX,rY],
+            [rX,rY, cX-Math.sin(rRad)*40,cY+Math.cos(rRad)*40, hX2-Math.cos(rRad)*30,hY2-Math.sin(rRad)*30, hX2,hY2]
+        ];
+    } else {
+        const cpX1=hX1+(rX-hX1)*0.3-Math.sin(rRad)*30, cpY1=hY1+(rY-hY1)*0.3+Math.cos(rRad)*30;
+        const cpX2=hX2+(rX-hX2)*0.3+Math.sin(rRad)*30, cpY2=hY2+(rY-hY2)*0.3-Math.cos(rRad)*30;
+        segs = [ [hX1,hY1, cpX1,cpY1, cpX2,cpY2, rX,rY], [rX,rY, rX,rY, hX2,hY2, hX2,hY2] ];
+    }
+    const pts=[]; const per=Math.max(3,Math.floor(n/segs.length));
+    segs.forEach((s,si)=>{ for(let i=(si===0?0:1);i<=per;i++){ const tt=i/per,u=1-tt;
+        pts.push({ x:u*u*u*s[0]+3*u*u*tt*s[2]+3*u*tt*tt*s[4]+tt*tt*tt*s[6], y:u*u*u*s[1]+3*u*u*tt*s[3]+3*u*tt*tt*s[5]+tt*tt*tt*s[7] }); } });
+    return pts;
+}
+function strokePts(pts, width, alpha, color, blur){
+    if(pts.length<2) return;
+    ctx.save(); ctx.globalAlpha=Math.max(0,Math.min(1,alpha));
+    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineCap='round'; ctx.lineJoin='round';
+    if(blur){ ctx.shadowColor=color; ctx.shadowBlur=blur; }
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke();
+    ctx.restore();
+}
+function beadPts(pts, size, alpha, color, blur){
+    ctx.save(); ctx.globalAlpha=Math.max(0,Math.min(1,alpha)); ctx.fillStyle=color;
+    if(blur){ ctx.shadowColor=color; ctx.shadowBlur=blur; }
+    for(let i=0;i<pts.length;i++){ ctx.beginPath(); ctx.arc(pts[i].x,pts[i].y,size*0.5,0,Math.PI*2); ctx.fill(); }
+    ctx.restore();
+}
+function drawRope(back) {
+    if (!(rope.isSpinning || rope.angle>0)) return;
+    const R = ROPES[save.equippedRope];
+    const rainbow = R.color==='rainbow';
+    const col = rainbow ? `hsl(${rHue},90%,60%)` : R.color;
+    const depth = Math.sin(rope.angle*Math.PI/180);   // +:手前(下) / -:奥(上)
+    const w = back ? Math.max(0,-depth) : Math.max(0,depth);
+    const alpha = 0.32 + 0.68*w;
+    const baseW = R.style==='heavy' ? 6 : (rainbow ? 4 : 3.2);
+    const width = baseW * (0.7 + (back?0.25:0.6)*w);
+    const blur = (rainbow || R.style==='glow') ? 10 : 0;
+    const pts = getRopePathPoints(rope.angle, 22);
+
+    // 残像（手前側のみ・速度で本数増）
+    if (!back) {
+        const spd = rope.getSpeed();
+        const ghosts = spd>30?3:spd>20?2:1;
+        for(let g=1; g<=ghosts; g++) strokePts(getRopePathPoints(rope.angle - g*7, 18), width*0.7, alpha*0.16, col, 0);
+    }
+    // 本体（素材別）
+    if (R.style==='bead') beadPts(pts, width*1.05, alpha, col, blur);
+    else if (R.style==='heavy') { strokePts(pts, width+2.5, alpha*0.9, '#0f172a', 0); strokePts(pts, width, alpha, col, 0); }
+    else strokePts(pts, width, alpha, col, blur);
+
+    // 接地（最下点付近）：床に影
+    if (!back && depth>0.45 && rope.isSpinning) {
+        const gY = player.baseY + player.h - 5; const k=(depth-0.45)/0.55;
+        ctx.save(); ctx.globalAlpha=0.22*k; ctx.fillStyle='#000';
+        ctx.beginPath(); ctx.ellipse(player.x, gY+3, 24+20*k, 4+3*k, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+    ctx.shadowBlur = 0;
+}
+function hexAlpha(hex, a) {
+    if (hex[0] !== '#') return hex;
+    const n = parseInt(hex.slice(1),16);
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+// 縦タイミングゲージ：キャラクターの脇に表示。
+//  グレー(下)=予備動作（接地してためている区間）。ポインタがここを上りきると…
+//  緑(PERFECT)に入った瞬間に踏み切ってジャンプ。緑→オレンジ(GOOD)が入力受付。
+//  ジャンプの高さに連動して緑＋オレンジの長さもレベルで伸びる。
+function drawVerticalGauge() {
+    const win = getPressWindow();
+    const maxH = player.getHeight();
+
+    const gx = player.x + 54;                 // ゲージ中心X（キャラ右脇）
+    const gw = 13;                            // 幅
+    const airPx = 56 + maxH * 1.0;            // 緑＋オレンジ（滞空＝跳躍高さに連動）
+    const greenPx = airPx * (win.perfectEnd / win.goodEnd); // PERFECT区間
+    const orangePx = airPx - greenPx;                       // GOOD区間
+    const greyPx = 30;                        // 予備動作（地面より下に表示）
+
+    const gY2 = player.baseY + player.h - 5;  // 地面ライン
+    const takeoffY = gY2;                     // 踏み切り＝地面ライン（グレー/緑の境界）
+    const gaugeBotY = takeoffY + greyPx;      // グレーは地面より下へ伸びる
+    const greenTopY = takeoffY - greenPx;
+    const orangeTopY = greenTopY - orangePx;  // ゲージ最上部
+
+    const done = firstPressAngle !== null;
+    const a = player.jumpAngle;
+
+    // ポインタ位置と受付状態
+    let ptrY = null, active = false, perfectNow = false, inPrep = false;
+    if (player.isGrounded) {
+        // 予備動作：頭の沈み込みに合わせ、地面ラインから下へ沈んで戻る
+        const dip = Math.sin((player.prepProg||0) * Math.PI); // 0→1→0
+        ptrY = takeoffY + dip * greyPx;
+        inPrep = true;
+    } else if (a <= win.goodEnd) {
+        // 受付ウィンドウ：地面ラインから上へ 緑→オレンジ
+        ptrY = takeoffY - (a / win.goodEnd) * airPx;
+        active = !done;
+        perfectNow = a <= win.perfectEnd;
+    } // それ以降（頂点〜下降）はポインタ非表示＝今回の受付終了
+
+    // 背景パネル
+    ctx.fillStyle = "rgba(2,6,23,0.65)";
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(gx-gw/2-4, orangeTopY-8, gw+8, (gaugeBotY-orangeTopY)+12, 7)
+                  : ctx.rect(gx-gw/2-4, orangeTopY-8, gw+8, (gaugeBotY-orangeTopY)+12);
+    ctx.fill();
+
+    // グレー（予備動作：地面より下）
+    ctx.fillStyle = "#475569"; ctx.fillRect(gx-gw/2, takeoffY, gw, gaugeBotY-takeoffY);
+    // オレンジ（GOOD）
+    ctx.fillStyle = done ? "#3f3f46" : "#d97706"; ctx.fillRect(gx-gw/2, orangeTopY, gw, greenTopY-orangeTopY);
+    // 緑（PERFECT）
+    ctx.fillStyle = done ? "#374151" : "#16a34a"; ctx.fillRect(gx-gw/2, greenTopY, gw, takeoffY-greenTopY);
+
+    // 受付中は現在ゾーンを発光
+    if (active) {
+        ctx.save();
+        ctx.shadowColor = perfectNow ? "#34d399" : "#fbbf24"; ctx.shadowBlur = 16;
+        ctx.fillStyle = perfectNow ? "#22c55e" : "#f59e0b";
+        const zTop = perfectNow ? greenTopY : orangeTopY;
+        ctx.fillRect(gx-gw/2, zTop, gw, takeoffY-zTop); // 受付ゾーンを明るく
+        ctx.restore();
+    }
+
+    // 踏み切りライン（＝地面ライン）＆グレー下端
+    ctx.strokeStyle = "#22d3ee"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(gx-gw/2-5, takeoffY); ctx.lineTo(gx+gw/2+5, takeoffY); ctx.stroke();
+    ctx.strokeStyle = "#475569"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(gx-gw/2-2, gaugeBotY); ctx.lineTo(gx+gw/2+2, gaugeBotY); ctx.stroke();
+
+    // ポインタ ►（ゲージ左に置き、右＝ゲージを指す）
+    if (ptrY !== null) {
+        ctx.fillStyle = active ? (perfectNow ? "#34d399" : "#fbbf24") : (inPrep ? "#cbd5e1" : "#94a3b8");
+        ctx.beginPath();
+        ctx.moveTo(gx-gw/2-3, ptrY);
+        ctx.lineTo(gx-gw/2-13, ptrY-7);
+        ctx.lineTo(gx-gw/2-13, ptrY+7);
+        ctx.closePath(); ctx.fill();
+    }
+
+    // ラベル／済チェック
+    if (done) {
+        ctx.fillStyle = "#34d399"; ctx.font = "900 13px 'Noto Sans JP',sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("✓", gx, orangeTopY-12); ctx.textAlign = "left";
+    } else {
+        ctx.fillStyle = "#94a3b8"; ctx.font = "bold 8px 'Orbitron',sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("TIMING", gx, orangeTopY-12); ctx.textAlign = "left";
+    }
+
+    // 「いま！」サイン（キャラ左）
+    if (active && !rope.isSpinning) {
+        const pulse = 0.55 + 0.45*Math.sin(Date.now()/85);
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = perfectNow ? "#34d399" : "#fbbf24";
+        ctx.font = "900 17px 'Noto Sans JP',sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("いま！", player.x - 46, player.y + 8);
+        ctx.globalAlpha = 1; ctx.textAlign = "left";
+    } else if (inPrep && !done && (player.prepProg||0) > 0.45) {
+        // 予備動作の後半に「ためて…」で構えを促す
+        ctx.globalAlpha = 0.5 + 0.3*Math.sin(Date.now()/120);
+        ctx.fillStyle = "#cbd5e1";
+        ctx.font = "700 12px 'Noto Sans JP',sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("ためて…", player.x - 46, player.y + 8);
+        ctx.globalAlpha = 1; ctx.textAlign = "left";
+    }
+
+    // 初回チュートリアル
+    if (tutorialHintLeft > 0 && gameState === 'PRACTICE') {
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = "#34d399"; ctx.font = "bold 11px 'Noto Sans JP',sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("緑に入ったら「回す」！", gx, gaugeBotY + 20);
+        ctx.globalAlpha = 1; ctx.textAlign = "left";
+    }
+}
+
+// ==========================================
+// 📤 結果カード生成＆シェア
+// ==========================================
+const GAME_NAME = "Master of Rope";
+const SHARE_URL = "https://suzuri.jp/Heino_naka";
+let shareBlob = null, shareDataURL = null;
+
+function drawCardCharacter(c, x, y, s) {
+    // 結果カード用の簡易キャラ（現在の見た目を反映）
+    const cs = getCharStyle();
+    c.save(); c.translate(x, y); c.scale(s, s);
+    if (cs.cape) { c.fillStyle = cs.accent; c.globalAlpha = 0.9;
+        c.beginPath(); c.moveTo(-9,17); c.lineTo(9,17); c.lineTo(13,17+(cs.capeBig?48:36)); c.lineTo(0,17+(cs.capeBig?42:30)); c.lineTo(-13,17+(cs.capeBig?48:36)); c.closePath(); c.fill(); c.globalAlpha=1; }
+    c.fillStyle = cs.outfit; c.beginPath(); c.roundRect ? c.roundRect(-12,16,24,40,6) : c.rect(-12,16,24,40); c.fill();
+    c.strokeStyle="#fff"; c.lineWidth=2; c.beginPath(); c.moveTo(0,16); c.lineTo(0,56); c.stroke();
+    c.fillStyle="#1e293b"; c.fillRect(-9,52,7,18); c.fillRect(2,52,7,18);
+    c.fillStyle="#f8fafc"; c.fillRect(-10,66,10,5); c.fillRect(1,66,10,5);
+    c.fillStyle="#fde68a"; c.beginPath(); c.arc(0,2,12,0,Math.PI*2); c.fill();
+    c.fillStyle=cs.hair; c.beginPath(); c.arc(0,-2,13,Math.PI,0); c.fill(); c.fillRect(-13,-2,26,6);
+    if (cs.crown){ c.fillStyle="#fde047"; c.beginPath(); c.moveTo(-9,-11); c.lineTo(-6,-19); c.lineTo(-3,-12); c.lineTo(0,-20); c.lineTo(3,-12); c.lineTo(6,-19); c.lineTo(9,-11); c.closePath(); c.fill(); }
+    if (cs.headband){ c.fillStyle=cs.accent; c.fillRect(-13,-4,26,4); c.fillRect(-16,-3,5,9); }
+    c.fillStyle="#fde68a"; c.beginPath(); c.ellipse(-14,4,6,12,Math.PI/6,0,Math.PI*2); c.fill();
+    if (cs.wrist){ c.fillStyle=cs.accent; c.fillRect(-20,11,11,4); }
+    c.fillStyle="#fde68a"; c.fillRect(10,24,7,5); c.fillRect(-17,24,7,5);
+    c.fillStyle="#0f172a"; c.fillRect(5,0,3,4);
+    c.restore();
+}
+
+function generateResultCard(headline) {
+    const W = 600, H = 360;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    c.textBaseline = 'alphabetic';
+    // 背景
+    const g = c.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,'#0b1326'); g.addColorStop(1,'#111c33');
+    c.fillStyle = g; c.fillRect(0,0,W,H);
+    // 床（下部のみ・はみ出さないようクリップ）
+    c.save(); c.beginPath(); c.rect(0,H-70,W,70); c.clip();
+    c.fillStyle = '#0e1a30'; c.fillRect(0,H-70,W,70);
+    c.strokeStyle = 'rgba(51,65,85,0.45)'; c.lineWidth = 2;
+    for (let i=-40;i<W+90;i+=58){ c.beginPath(); c.moveTo(i,H-70); c.lineTo(i-70,H); c.stroke(); }
+    c.restore();
+    c.strokeStyle = '#1e293b'; c.lineWidth = 6; c.strokeRect(3,3,W-6,H-6);
+
+    // タイトル小
+    c.textAlign = 'left';
+    c.fillStyle = '#facc15'; c.font = "900 15px 'Orbitron', sans-serif";
+    c.fillText("⚡ MASTER OF ROPE", 30, 34);
+
+    // 見出し（横幅に合わせて自動縮小：キャラに被らない）
+    let hs = 28; c.font = `900 ${hs}px 'Noto Sans JP', sans-serif`;
+    while (c.measureText(headline).width > 400 && hs > 15) { hs -= 1; c.font = `900 ${hs}px 'Noto Sans JP', sans-serif`; }
+    c.fillStyle = '#34d399'; c.fillText(headline, 30, 70);
+    c.strokeStyle = '#1e293b'; c.lineWidth = 2; c.beginPath(); c.moveTo(30, 84); c.lineTo(430, 84); c.stroke();
+
+    // キャラ（右側）背景グロー＋本体
+    c.save(); c.globalAlpha = 0.16;
+    const rg = c.createRadialGradient(505,195,8,505,195,82);
+    rg.addColorStop(0, getCharStyle().outfit); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = rg; c.beginPath(); c.arc(505,195,82,0,Math.PI*2); c.fill(); c.restore();
+    drawCardCharacter(c, 505, 182, 1.5);
+
+    // ステータス（左：2×2グリッド）
+    const cells = [
+        [30,128, "RANK", getRank(save.lifetimeJumps), '#22d3ee'],
+        [230,128, "TOTAL JUMPS", save.totalJumps.toLocaleString(), '#fde047'],
+        [30,214, "BEST COMBO", String(save.highCombo), '#34d399'],
+        [230,214, "検定クリア", save.passedExams.length + " / " + EXAMS.length, '#f472b6'],
+    ];
+    cells.forEach(([cx,cy,k,v,col]) => {
+        c.textAlign = 'left';
+        c.fillStyle = '#94a3b8'; c.font = "bold 12px 'Noto Sans JP', sans-serif";
+        c.fillText(k, cx, cy);
+        c.fillStyle = col; c.font = "900 25px 'Orbitron', sans-serif";
+        c.fillText(v, cx, cy+30);
+    });
+
+    // フッター
+    c.strokeStyle = '#1e293b'; c.lineWidth = 1; c.beginPath(); c.moveTo(30, H-34); c.lineTo(W-30, H-34); c.stroke();
+    c.fillStyle = '#94a3b8'; c.font = "bold 13px 'Noto Sans JP', sans-serif"; c.textAlign = 'left';
+    c.fillText("created by へいなか", 30, H-14);
+    c.fillStyle = '#fbbf24'; c.font = "bold 12px 'Noto Sans JP', sans-serif"; c.textAlign = 'right';
+    c.fillText("suzuri.jp/Heino_naka", W-30, H-14);
+
+    c.textAlign = 'left';
+    return cv;
+}
+
+function openShareModal(headline) {
+    initAudio();
+    const cv = generateResultCard(headline);
+    shareDataURL = cv.toDataURL('image/png');
+    document.getElementById('share-img').src = shareDataURL;
+    document.getElementById('share-title').innerText = headline;
+    cv.toBlob(b => { shareBlob = b; }, 'image/png');
+    // Web Share（ファイル対応端末のみ）
+    let canFileShare = false;
+    try { canFileShare = !!(navigator.canShare && navigator.canShare({ files: [new File([], 'x.png', {type:'image/png'})] })); } catch(e) { canFileShare = false; }
+    document.getElementById('webshare-btn').classList.toggle('hidden', !canFileShare);
+    const m = document.getElementById('share-modal'), ct = document.getElementById('share-modal-content');
+    m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
+}
+function closeShareModal() {
+    const m = document.getElementById('share-modal'), ct = document.getElementById('share-modal-content');
+    m.classList.add('opacity-0','pointer-events-none'); ct.classList.remove('scale-100'); ct.classList.add('scale-95');
+}
+function downloadCard() {
+    if (!shareDataURL) return;
+    const a = document.createElement('a');
+    a.href = shareDataURL; a.download = 'master-of-rope.png';
+    document.body.appendChild(a); a.click(); a.remove();
+}
+function tweetCard() {
+    const text = `なわとび検定シミュレーター「${GAME_NAME}」で遊んでます！ RANK:${getRank(save.lifetimeJumps)} / BEST COMBO:${save.highCombo} #MasterOfRope`;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(SHARE_URL)}`;
+    window.open(url, '_blank', 'noopener');
+}
+async function webShareCard() {
+    try {
+        if (shareBlob && navigator.canShare && navigator.canShare({ files: [new File([shareBlob],'r.png',{type:'image/png'})] })) {
+            const file = new File([shareBlob], 'master-of-rope.png', { type: 'image/png' });
+            await navigator.share({ files: [file], title: GAME_NAME, text: `Master of Rope で遊んでます！ #MasterOfRope` });
+        } else if (navigator.share) {
+            await navigator.share({ title: GAME_NAME, text: 'Master of Rope で遊んでます！', url: SHARE_URL });
+        }
+    } catch(e) {}
+}
+
+// ==========================================
+// 🚀 起動
+// ==========================================
+window.addEventListener('load', () => {
+    loadGame(); renderShop(); renderStages(); renderExams(); resize(); loop();
+    if (!save.seenTutorial) document.getElementById('howto-box').classList.remove('hidden');
+});
+</script>
+</body>
+</html>
