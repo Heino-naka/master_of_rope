@@ -116,6 +116,7 @@
                     <p class="text-[10px] text-slate-400 mt-3 max-w-[240px] leading-relaxed">
                         「練習」は合否なしの自由練習です。<br>合否が出る<span class="text-red-300 font-bold">検定</span>は、右の一覧で種目の<span class="text-red-300 font-bold">「挑戦する」</span>を押すと始まります。
                     </p>
+                    <button onclick="openTrickGuide()" class="mt-2 text-[11px] text-sky-300 hover:text-sky-200 underline underline-offset-2 transition-all">🤸 技の出し方を見る</button>
                 </div>
 
                 <!-- 息切れオーバーレイ（スタミナ回復と再開） -->
@@ -235,9 +236,15 @@
             <!-- タブ2: 検定 -->
             <div id="tab-content-exams" class="hidden space-y-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10">
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
-                    <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-3">
-                        <h3 class="text-xs font-black text-slate-500 tracking-widest">OFFICIAL EXAMS</h3>
-                        <button onclick="openReflectionsGallery()" class="bg-slate-800 hover:bg-emerald-900/70 border border-slate-700 text-emerald-300 text-[10px] font-bold py-1 px-2 rounded transition-all">📔 振り返りの記録</button>
+                    <div class="border-b border-slate-800 pb-2 mb-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-black text-slate-500 tracking-widest">OFFICIAL EXAMS</h3>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mt-2">
+                            <button onclick="openCertShelf()" class="bg-slate-800 hover:bg-amber-900/60 border border-slate-700 text-amber-300 text-[10px] font-bold py-1 px-2 rounded transition-all">🖼️ 合格証書の棚</button>
+                            <button onclick="openReflectionsGallery()" class="bg-slate-800 hover:bg-emerald-900/70 border border-slate-700 text-emerald-300 text-[10px] font-bold py-1 px-2 rounded transition-all">📔 振り返りの記録</button>
+                            <button onclick="openTrickGuide()" class="bg-slate-800 hover:bg-sky-900/60 border border-slate-700 text-sky-300 text-[10px] font-bold py-1 px-2 rounded transition-all">🤸 技の出し方</button>
+                        </div>
                     </div>
                     <p class="text-[10px] text-slate-400 leading-relaxed mb-4">
                         お題を達成するとクリア。<span class="text-emerald-400">級位</span>は自由に挑戦可。<span class="text-amber-400">段位</span>以降は前の段に合格すると解放。<br>
@@ -308,6 +315,7 @@
             </div>
             <button id="webshare-btn" onclick="webShareCard()" class="hidden control-btn w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-lg text-sm transition-all mb-2">📤 画像つきでシェア（おすすめ）</button>
             <p class="text-[10px] text-slate-400 leading-relaxed mb-2 text-center">スマホは「画像つきでシェア」が確実です。<br>Xボタンの場合、画像は自動保存されるので投稿画面で添付してください。</p>
+            <button id="back-to-shelf-btn" onclick="backToShelf()" class="hidden control-btn w-full mb-2 bg-amber-700/80 hover:bg-amber-600 text-white font-bold py-2 rounded-lg text-xs transition-all">🖼️ 棚に戻る</button>
             <button onclick="closeShareModal()" class="control-btn w-full bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
         </div>
     </div>
@@ -322,6 +330,40 @@
             <p class="text-[10px] text-slate-400 mb-3">検定合格のときに書いた「意識したこと」の記録です。読み返すと、自分の上達が見えてきます。</p>
             <div id="gallery-list" class="space-y-2 overflow-y-auto flex-1 pr-1"></div>
             <button onclick="closeReflectionsGallery()" class="control-btn w-full mt-3 bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
+        </div>
+    </div>
+
+    <!-- 合格証書の棚（額に飾られて増えていく） -->
+    <div id="shelf-modal" class="fixed inset-0 z-[112] flex items-center justify-center bg-black/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-gradient-to-b from-amber-950/30 to-slate-900 border border-amber-700/50 p-5 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-200 max-h-[82vh] flex flex-col" id="shelf-modal-content">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-lg font-black text-amber-300 tracking-wider">🖼️ 合格証書の棚</h3>
+                <span id="shelf-count" class="text-[11px] text-amber-200 font-black"></span>
+            </div>
+            <p class="text-[10px] text-slate-400 mb-3">合格すると、証書が額に飾られて増えていきます。額をタップすると証書を開けます（保存・シェアもできます）。</p>
+            <div id="shelf-grid" class="grid grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-1"></div>
+            <button onclick="closeCertShelf()" class="control-btn w-full mt-3 bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
+        </div>
+    </div>
+
+    <!-- 技の出し方（技ずかん） -->
+    <div id="guide-modal" class="fixed inset-0 z-[112] flex items-center justify-center bg-black/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border border-sky-700/50 p-5 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-200 max-h-[82vh] flex flex-col" id="guide-modal-content">
+            <h3 class="text-lg font-black text-sky-300 tracking-wider mb-1">🤸 技の出し方</h3>
+            <div class="bg-slate-950 border border-slate-700 rounded-lg p-3 mb-3 space-y-2">
+                <p class="text-[11px] text-slate-200 font-black">操作はたった2つ</p>
+                <div class="flex items-start gap-2">
+                    <span class="text-[10px] font-black text-emerald-200 bg-emerald-900/60 rounded px-1.5 py-0.5 whitespace-nowrap mt-0.5">回す</span>
+                    <p class="text-[10px] text-slate-300 leading-snug">PCは<b class="text-white">スペースキー</b>／スマホは<b class="text-white">🔄回す</b>ボタン。1回押すと縄が1回転（＝前跳び）。</p>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="text-[10px] font-black text-amber-200 bg-amber-900/60 rounded px-1.5 py-0.5 whitespace-nowrap mt-0.5">交差</span>
+                    <p class="text-[10px] text-slate-300 leading-snug">PCは<b class="text-white">Shiftを押しながらスペース</b>／スマホは<b class="text-white">交差</b>ボタンをオンにして回す（＝交差跳び）。</p>
+                </div>
+                <p class="text-[10px] text-slate-400 leading-snug pt-1.5 border-t border-slate-800">滞空中に「回す」を<b class="text-white">続けて連打</b>すると多重跳び（2回＝二重、3回＝三重）。「交差」のオン/オフを混ぜると、あや・つばめ系になります。</p>
+            </div>
+            <div id="guide-list" class="space-y-2 overflow-y-auto flex-1 pr-1"></div>
+            <button onclick="closeTrickGuide()" class="control-btn w-full mt-3 bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
         </div>
     </div>
 
@@ -1820,7 +1862,7 @@ function drawVerticalGauge() {
 const GAME_NAME = "Master of Rope";
 const GAME_URL  = "https://heino-naka.github.io/master_of_rope/";  // シェアで差し込むのはゲーム本体
 const SHOP_URL  = "https://suzuri.jp/Heino_naka";
-let shareBlob = null, shareDataURL = null, shareIsCertificate = false;
+let shareBlob = null, shareDataURL = null, shareIsCertificate = false, certFromShelf = false;
 
 function drawCardCharacter(c, x, y, s) {
     // 結果カード用の簡易キャラ（現在の見た目を反映）
@@ -1895,6 +1937,84 @@ function closeReflectionsGallery() {
     const m = document.getElementById('gallery-modal'), ct = document.getElementById('gallery-modal-content');
     m.classList.add('opacity-0','pointer-events-none'); ct.classList.remove('scale-100'); ct.classList.add('scale-95');
 }
+
+// ===== 合格証書の棚 =====
+function tierBadge(tier){
+    if (tier === '皆伝') return { bg:'#7c3aed', fg:'#ede9fe' };
+    if (tier === '段')   return { bg:'#b45309', fg:'#fef3c7' };
+    return { bg:'#0f766e', fg:'#ccfbf1' };
+}
+function renderCertShelf(){
+    const grid = document.getElementById('shelf-grid');
+    if (!grid) return;
+    const passed = save.passedExams || [];
+    document.getElementById('shelf-count').innerText = `${passed.length} / ${EXAMS.length} 枚`;
+    grid.innerHTML = EXAMS.map(e => {
+        const got = passed.includes(e.id);
+        const grade = e.title.split(':')[0].trim();
+        if (got) {
+            const b = tierBadge(e.tier);
+            return `<button onclick="reopenCertificate('${e.id}')" class="group relative rounded-md p-1.5 border-2 transition-all active:scale-95"
+                style="border-color:#d4a72c;background:linear-gradient(160deg,#0b1220,#111c33);">
+                <div class="absolute inset-0.5 rounded-sm border border-amber-500/30 pointer-events-none"></div>
+                <div class="text-[15px] leading-none mb-1">🏅</div>
+                <div class="text-[11px] font-black text-amber-200 leading-tight">${escapeHtml(grade)}</div>
+                <div class="mt-1 inline-block text-[8px] font-black px-1 py-0.5 rounded" style="background:${b.bg};color:${b.fg};">${e.tier}</div>
+                <div class="text-[7px] text-amber-300/70 mt-0.5 group-hover:text-amber-200">タップで開く</div>
+            </button>`;
+        }
+        return `<div class="rounded-md p-1.5 border-2 border-dashed border-slate-700 bg-slate-950/60 flex flex-col items-center justify-center min-h-[78px] opacity-70">
+                <div class="text-[15px] leading-none mb-1 grayscale opacity-40">🔒</div>
+                <div class="text-[10px] font-bold text-slate-500 leading-tight text-center">${escapeHtml(grade)}</div>
+                <div class="text-[7px] text-slate-600 mt-0.5">未取得</div>
+            </div>`;
+    }).join('');
+}
+function openCertShelf(){
+    renderCertShelf();
+    const m = document.getElementById('shelf-modal'), ct = document.getElementById('shelf-modal-content');
+    m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
+}
+function closeCertShelf(){
+    const m = document.getElementById('shelf-modal'), ct = document.getElementById('shelf-modal-content');
+    m.classList.add('opacity-0','pointer-events-none'); ct.classList.remove('scale-100'); ct.classList.add('scale-95');
+}
+
+// ===== 技の出し方（技ずかん）=====
+const TRICK_GUIDE = [
+    { name:'前跳び', mult:5,   how:'「回す」を1回。（スペース／🔄回す）', tip:'すべての基本。まずはリズムを掴もう。' },
+    { name:'交差跳び', mult:8, how:'交差しながら「回す」。（Shift＋スペース／交差ONで回す）', tip:'腕をクロスして回すイメージ。' },
+    { name:'あや跳び', mult:8, how:'1回ごとに交差を入れたり外したり。（Shiftを押す↔離す／交差ボタンON↔OFFを交互に）', tip:'開いて→交差→開いて…の交互。続けると連続あやに。' },
+    { name:'二重跳び', mult:20, how:'1回のジャンプの滞空中に「回す」を素早く2回。（スペース2連打）', tip:'跳躍力が上がるほど余裕が生まれる。' },
+    { name:'はやぶさ（あや二重）', mult:32, how:'滞空中に2回まわすうち、片方だけ交差。（例：1回目ふつう→2回目はShift）', tip:'二重＋あやの合わせ技。' },
+    { name:'二重交差跳び', mult:45, how:'交差したまま滞空中に2回。（Shiftを押しっぱなしでスペース2回）', tip:'交差は縄がやや遅く、消耗も大きい。' },
+    { name:'三重跳び', mult:55, how:'滞空中に「回す」を3回。（スペース3連打）', tip:'腕力（回す速さ）と跳躍力が要る。' },
+    { name:'つばめ（三重あや）', mult:75, how:'三重のうち1回だけ交差を混ぜる。', tip:'三重＋あや。難関。' },
+    { name:'三重交差跳び', mult:110, how:'三重のうち2回以上を交差で。（Shiftを押しながら3回）', tip:'超高難度。' },
+    { name:'四重跳び〜', mult:130, how:'滞空中に「回す」を4回以上。', tip:'人間卒業の領域。最高装備で挑め。' },
+];
+function renderTrickGuide(){
+    const list = document.getElementById('guide-list');
+    if (!list) return;
+    list.innerHTML = TRICK_GUIDE.map(t => `
+        <div class="p-2.5 rounded-lg border border-slate-700 bg-slate-950">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-[13px] font-black text-white">${t.name}</span>
+                <span class="text-[9px] font-bold text-yellow-400">×${t.mult}</span>
+            </div>
+            <p class="text-[11px] text-sky-200 leading-snug">▶ ${t.how}</p>
+            <p class="text-[10px] text-slate-400 leading-snug mt-0.5">${t.tip}</p>
+        </div>`).join('');
+}
+function openTrickGuide(){
+    renderTrickGuide();
+    const m = document.getElementById('guide-modal'), ct = document.getElementById('guide-modal-content');
+    m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
+}
+function closeTrickGuide(){
+    const m = document.getElementById('guide-modal'), ct = document.getElementById('guide-modal-content');
+    m.classList.add('opacity-0','pointer-events-none'); ct.classList.remove('scale-100'); ct.classList.add('scale-95');
+}
 document.addEventListener('input', e => {
     if (e.target && e.target.id === 'reflect-input') {
         document.getElementById('reflect-count').innerText = String(e.target.value.length);
@@ -1912,13 +2032,19 @@ function finishCertificate(exam, reflection) {
     // 振り返りを記録として残す（周回しても消えない・あとで見返せる）
     if (!Array.isArray(save.reflections)) save.reflections = [];
     const d = new Date();
+    const dateStr = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
     save.reflections.push({
         examId: exam.id, title: exam.title, text: (reflection || '').trim(),
-        date: `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`, prestige: save.prestige || 0
+        date: dateStr, prestige: save.prestige || 0
     });
     saveGame();
     if (typeof renderReflections === 'function') renderReflections();
-    const cv = generateCertificate(exam, reflection);
+    certFromShelf = false;
+    showCertificateModal(exam, reflection);
+}
+// 証書をモーダルに表示（合格直後にも、あとからの再表示にも使う）
+function showCertificateModal(exam, reflection, dateOverride) {
+    const cv = generateCertificate(exam, reflection, dateOverride);
     shareIsCertificate = true;
     shareDataURL = cv.toDataURL('image/png');
     document.getElementById('share-img').src = shareDataURL;
@@ -1927,8 +2053,32 @@ function finishCertificate(exam, reflection) {
     let canFileShare = false;
     try { canFileShare = !!(navigator.canShare && navigator.canShare({ files: [new File([], 'x.png', {type:'image/png'})] })); } catch(e) { canFileShare = false; }
     document.getElementById('webshare-btn').classList.toggle('hidden', !canFileShare);
+    document.getElementById('back-to-shelf-btn').classList.toggle('hidden', !certFromShelf);
     const m = document.getElementById('share-modal'), ct = document.getElementById('share-modal-content');
     m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
+}
+function backToShelf() {
+    closeShareModal();
+    openCertShelf();
+}
+// 棚から証書を再表示（保存した振り返り本文・日付を復元）
+function reopenCertificate(examId) {
+    const exam = EXAMS.find(e => e.id === examId);
+    if (!exam) return;
+    let reflection = '', dOver = null;
+    if (Array.isArray(save.reflections)) {
+        for (let i = save.reflections.length - 1; i >= 0; i--) {
+            if (save.reflections[i].examId === examId) {
+                reflection = save.reflections[i].text || '';
+                const p = (save.reflections[i].date || '').split('/');
+                if (p.length === 3) dOver = `${p[0]}年${p[1]}月${p[2]}日`;
+                break;
+            }
+        }
+    }
+    closeCertShelf();
+    certFromShelf = true;
+    showCertificateModal(exam, reflection, dOver);
 }
 
 // 縦長の合格証書（振り返り＋現実への一歩を焼き込む）
@@ -1941,7 +2091,7 @@ function bridgeMessage(examId) {
         ex4: ['外で、あや跳びを続けてみよう。', '「開いて・交差」のリズムが鍵。'],
         ex5: ['三重跳びや二重交差は大技。', 'まず二重を安定させてから挑もう。'],
         dan0: ['本物の二重跳びを、5回連続で。', 'ゲームで掴んだリズムを、体で。'],
-        dan1: ['二重跳び10回連続を、本物で。', '足が速く動くか、試してみよう。'],
+        dan1: ['二重跳び10回連続を、本物で。', '意外と、速さよりもゆったり跳ぶことが大事だよ。'],
         dan2: ['はやぶさ（あや二重）は難関。', '二重が安定したら挑戦してみて。'],
         dan3: ['三重跳びは一流の証。', '本物で1回跳べたら、大したものだ。'],
         dan4: ['三重を連続で。もう達人級。', '安全な場所で、無理せずいこう。'],
@@ -1950,7 +2100,7 @@ function bridgeMessage(examId) {
     };
     return M[examId] || ['つぎは、ほんもののなわとびに', '挑戦しよう！'];
 }
-function generateCertificate(exam, reflection) {
+function generateCertificate(exam, reflection, dateOverride) {
     const W = 620, H = 800;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const c = cv.getContext('2d');
@@ -2023,7 +2173,7 @@ function generateCertificate(exam, reflection) {
 
     // 日付・署名（内枠線に重ならないよう余白を確保）
     const d = new Date();
-    const dateStr = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+    const dateStr = dateOverride || `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
     c.fillStyle = '#94a3b8'; c.font = "14px 'Noto Sans JP', sans-serif";
     c.fillText(dateStr, W/2, H-106);
     c.strokeStyle = 'rgba(212,167,44,0.35)'; c.lineWidth = 1;
@@ -2117,6 +2267,7 @@ function openShareModal(headline) {
     initAudio();
     const cv = generateResultCard(headline);
     shareIsCertificate = false;
+    certFromShelf = false;
     shareDataURL = cv.toDataURL('image/png');
     document.getElementById('share-img').src = shareDataURL;
     document.getElementById('share-title').innerText = headline;
@@ -2125,6 +2276,7 @@ function openShareModal(headline) {
     let canFileShare = false;
     try { canFileShare = !!(navigator.canShare && navigator.canShare({ files: [new File([], 'x.png', {type:'image/png'})] })); } catch(e) { canFileShare = false; }
     document.getElementById('webshare-btn').classList.toggle('hidden', !canFileShare);
+    document.getElementById('back-to-shelf-btn').classList.add('hidden');
     const m = document.getElementById('share-modal'), ct = document.getElementById('share-modal-content');
     m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
 }
