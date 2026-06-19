@@ -290,7 +290,8 @@
                 <button onclick="downloadCard()" class="control-btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-sm transition-all">📥 画像を保存</button>
                 <button onclick="tweetCard()" class="control-btn bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-lg text-sm transition-all">𝕏 でシェア</button>
             </div>
-            <button id="webshare-btn" onclick="webShareCard()" class="hidden control-btn w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2.5 rounded-lg text-sm transition-all mb-2">📤 他のアプリでシェア</button>
+            <button id="webshare-btn" onclick="webShareCard()" class="hidden control-btn w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-lg text-sm transition-all mb-2">📤 画像つきでシェア（おすすめ）</button>
+            <p class="text-[10px] text-slate-400 leading-relaxed mb-2 text-center">スマホは「画像つきでシェア」が確実です。<br>Xボタンの場合、画像は自動保存されるので投稿画面で添付してください。</p>
             <button onclick="closeShareModal()" class="control-btn w-full bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
         </div>
     </div>
@@ -1717,8 +1718,9 @@ function drawVerticalGauge() {
 // 📤 結果カード生成＆シェア
 // ==========================================
 const GAME_NAME = "Master of Rope";
-const SHARE_URL = "https://suzuri.jp/Heino_naka";
-let shareBlob = null, shareDataURL = null;
+const GAME_URL  = "https://heino-naka.github.io/master_of_rope/";  // シェアで差し込むのはゲーム本体
+const SHOP_URL  = "https://suzuri.jp/Heino_naka";
+let shareBlob = null, shareDataURL = null, shareIsCertificate = false;
 
 function drawCardCharacter(c, x, y, s) {
     // 結果カード用の簡易キャラ（現在の見た目を反映）
@@ -1817,6 +1819,7 @@ function finishCertificate(exam, reflection) {
     saveGame();
     if (typeof renderReflections === 'function') renderReflections();
     const cv = generateCertificate(exam, reflection);
+    shareIsCertificate = true;
     shareDataURL = cv.toDataURL('image/png');
     document.getElementById('share-img').src = shareDataURL;
     document.getElementById('share-title').innerText = `${exam.title.split(':')[0]} 合格証書`;
@@ -1907,7 +1910,7 @@ function generateCertificate(exam, reflection) {
     c.fillStyle = '#facc15'; c.font = "bold 16px 'Noto Sans JP', sans-serif";
     c.fillText('なわとび検定本部　へいなか', W/2, H-46);
     c.fillStyle = '#64748b'; c.font = "11px 'Noto Sans JP', sans-serif";
-    c.fillText('Master of Rope ｜ suzuri.jp/Heino_naka', W/2, H-28);
+    c.fillText('Master of Rope ｜ heino-naka.github.io/master_of_rope', W/2, H-28);
 
     c.textAlign = 'left';
     return cv;
@@ -1983,7 +1986,7 @@ function generateResultCard(headline) {
     c.fillStyle = '#94a3b8'; c.font = "bold 13px 'Noto Sans JP', sans-serif"; c.textAlign = 'left';
     c.fillText("created by へいなか", 30, H-14);
     c.fillStyle = '#fbbf24'; c.font = "bold 12px 'Noto Sans JP', sans-serif"; c.textAlign = 'right';
-    c.fillText("suzuri.jp/Heino_naka", W-30, H-14);
+    c.fillText("heino-naka.github.io/master_of_rope", W-30, H-14);
 
     c.textAlign = 'left';
     return cv;
@@ -1992,6 +1995,7 @@ function generateResultCard(headline) {
 function openShareModal(headline) {
     initAudio();
     const cv = generateResultCard(headline);
+    shareIsCertificate = false;
     shareDataURL = cv.toDataURL('image/png');
     document.getElementById('share-img').src = shareDataURL;
     document.getElementById('share-title').innerText = headline;
@@ -2013,18 +2017,25 @@ function downloadCard() {
     a.href = shareDataURL; a.download = 'master-of-rope-証書.png';
     document.body.appendChild(a); a.click(); a.remove();
 }
+function shareText() {
+    return shareIsCertificate
+        ? `なわとび検定シミュレーター「${GAME_NAME}」で合格しました！💮 RANK:${getRank(save.lifetimeJumps)} #MasterOfRope`
+        : `なわとび検定シミュレーター「${GAME_NAME}」で遊んでます！🪢 RANK:${getRank(save.lifetimeJumps)} / BEST COMBO:${save.highCombo} #MasterOfRope`;
+}
 function tweetCard() {
-    const text = `なわとび検定シミュレーター「${GAME_NAME}」で遊んでます！ RANK:${getRank(save.lifetimeJumps)} / BEST COMBO:${save.highCombo} #MasterOfRope`;
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(SHARE_URL)}`;
-    window.open(url, '_blank', 'noopener');
+    // Xのツイート画面には画像を自動添付できないため、URLはゲーム本体、画像は保存して添付しやすくする
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText())}&url=${encodeURIComponent(GAME_URL)}`;
+    window.open(url, '_blank', 'noopener');  // クリック操作内で開く（ブロック回避）
+    downloadCard();                          // 投稿画面で添付できるよう画像を保存
 }
 async function webShareCard() {
     try {
+        const text = `${shareText()}\n${GAME_URL}`;
         if (shareBlob && navigator.canShare && navigator.canShare({ files: [new File([shareBlob],'r.png',{type:'image/png'})] })) {
             const file = new File([shareBlob], 'master-of-rope.png', { type: 'image/png' });
-            await navigator.share({ files: [file], title: GAME_NAME, text: `Master of Rope で遊んでます！ #MasterOfRope` });
+            await navigator.share({ files: [file], title: GAME_NAME, text });   // 画像つきで共有
         } else if (navigator.share) {
-            await navigator.share({ title: GAME_NAME, text: 'Master of Rope で遊んでます！', url: SHARE_URL });
+            await navigator.share({ title: GAME_NAME, text: shareText(), url: GAME_URL });
         }
     } catch(e) {}
 }
