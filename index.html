@@ -462,20 +462,22 @@ const EXAMS = [
     { id:'ex2', tier:'級', title:'4級: 交差への誘い', desc:'交差跳び か あや跳び を合計3回以上ふくめて、連続15回。', reward:1800, check:(c,t)=>c>=15 && t.filter(x=>x.includes('交差')||x.includes('あや')).length>=3 },
     { id:'ex3', tier:'級', title:'3級: 滞空の境地', desc:'二重跳びを1回成功させよ。（跳躍力と腕力が必要）', reward:5000, check:(c,t)=>t.includes('二重跳び') },
     { id:'ex4', tier:'級', title:'2級: あや跳びマニア', desc:'あや跳びを連続で5回成功させよ。', reward:9000, check:(c,t)=>t.slice(-5).every(x=>x==='あや跳び')&&t.length>=5 },
-    { id:'ex5', tier:'級', title:'1級: 重力からの解放', desc:'三重跳び系、または二重交差跳びを成功させよ。', reward:22000, check:(c,t)=>t.some(x=>['三重跳び','つばめ(三重あや)','三重交差跳び','二重交差跳び'].includes(x)) },
+    { id:'ex5', tier:'級', title:'1級: 重力からの解放', desc:'三重跳び系、または二重交差跳びを成功させよ。', reward:12000, check:(c,t)=>t.some(x=>['三重跳び','つばめ(三重あや)','三重交差跳び','二重交差跳び'].includes(x)) },
     // ── 段（だん）── 級1級の先。連続性と総合力が問われる
-    { id:'dan1', tier:'段', title:'初段: 二重の安定', desc:'二重跳びを連続で10回成功させよ。', reward:40000,
+    { id:'dan0', tier:'段', title:'入段試験: 二重への確かな一歩', desc:'二重跳びを連続で5回成功させよ。（初段への橋渡し）', reward:7000,
+      check:(c,t)=>t.length>=5 && t.slice(-5).every(x=>x==='二重跳び') },
+    { id:'dan1', tier:'段', title:'初段: 二重の安定', desc:'二重跳びを連続で10回成功させよ。', reward:15000,
       check:(c,t)=>t.length>=10 && t.slice(-10).every(x=>x==='二重跳び') },
-    { id:'dan2', tier:'段', title:'弐段: はやぶさの舞', desc:'はやぶさ（あや二重）を連続で6回成功させよ。', reward:70000,
+    { id:'dan2', tier:'段', title:'弐段: はやぶさの舞', desc:'はやぶさ（あや二重）を連続で6回成功させよ。', reward:20000,
       check:(c,t)=>t.length>=6 && t.slice(-6).every(x=>x==='はやぶさ(あや二重)') },
-    { id:'dan3', tier:'段', title:'参段: 三重跳びの衝撃', desc:'三重跳びを連続で4回成功させよ。（レインボー級の装備推奨）', reward:120000,
+    { id:'dan3', tier:'段', title:'参段: 三重跳びの衝撃', desc:'三重跳びを連続で4回成功させよ。（レインボー級の装備推奨）', reward:28000,
       check:(c,t)=>t.length>=4 && t.slice(-4).every(x=>x==='三重跳び') },
-    { id:'dan4', tier:'段', title:'四段: 連続三重', desc:'三重跳び系を連続で6回成功させよ。', reward:200000,
+    { id:'dan4', tier:'段', title:'四段: 連続三重', desc:'三重跳び系を連続で6回成功させよ。', reward:38000,
       check:(c,t)=>t.length>=6 && t.slice(-6).every(x=>['三重跳び','つばめ(三重あや)','三重交差跳び'].includes(x)) },
-    { id:'dan5', tier:'段', title:'五段: つばめ返し', desc:'つばめ（三重あや）または三重交差跳びを連続で4回成功させよ。', reward:350000,
+    { id:'dan5', tier:'段', title:'五段: つばめ返し', desc:'つばめ（三重あや）または三重交差跳びを連続で4回成功させよ。', reward:50000,
       check:(c,t)=>t.length>=4 && t.slice(-4).every(x=>['つばめ(三重あや)','三重交差跳び'].includes(x)) },
     // ── 皆伝（かいでん）── 最終試験
-    { id:'master', tier:'皆伝', title:'免許皆伝: 人間卒業', desc:'四重跳び以上を成功させよ。常人には到達不能の領域。', reward:1000000,
+    { id:'master', tier:'皆伝', title:'免許皆伝: 人間卒業', desc:'四重跳び以上を成功させよ。常人には到達不能の領域。', reward:60000,
       check:(c,t)=>t.some(x=>/^[四五六七八九]重跳び$/.test(x) || (/^\d+重跳び$/.test(x))) }
 ];
 
@@ -624,6 +626,7 @@ let lastMode = 'PRACTICE', lastExamId = null, currentExam = null;
 let currentCombo = 0, recentTricks = [];
 let maxStamina = 140, stamina = 140;
 let examLives = 0, examLivesMax = 0; // 検定中のミス猶予
+let lastSingleCrossed = null;        // 直前の単発ジャンプの開閉状態（あや連続判定用）
 let recoverEndTime = 0; // 休憩終了時刻（ミリ秒）
 let tutorialHintLeft = 0; // 初回チュートリアル：あと何回ヒント表示するか
 
@@ -655,8 +658,9 @@ function examProgress(c, t){
         case 'ex2': { const cr = Math.min(t.filter(x=>x.includes('交差')||x.includes('あや')).length, 3);
                       return { cur: Math.min(c,15), need:15, label:`連続（交差かあや ${cr}/3）` }; }
         case 'ex3':  return { cur: t.includes('二重跳び')?1:0, need:1, binary:true, label:'二重跳びを1回' };
-        case 'ex4':  return { cur: tailRun(t,x=>x==='あや跳び'), need:5, label:'あや跳び 連続' };
+        case 'ex4':  return { cur: tailRun(t,x=>x==='あや跳び'), need:5, label:'あや跳び 連続（前⇄交差）' };
         case 'ex5':  return { cur: t.some(x=>['三重跳び','つばめ(三重あや)','三重交差跳び','二重交差跳び'].includes(x))?1:0, need:1, binary:true, label:'三重系/二重交差を1回' };
+        case 'dan0': return { cur: tailRun(t,x=>x==='二重跳び'), need:5, label:'二重跳び 連続' };
         case 'dan1': return { cur: tailRun(t,x=>x==='二重跳び'), need:10, label:'二重跳び 連続' };
         case 'dan2': return { cur: tailRun(t,x=>x==='はやぶさ(あや二重)'), need:6, label:'はやぶさ 連続' };
         case 'dan3': return { cur: tailRun(t,x=>x==='三重跳び'), need:4, label:'三重跳び 連続' };
@@ -714,7 +718,7 @@ function startGame(mode, examId = null) {
     gameState = mode;
     currentExam = examId ? EXAMS.find(e=>e.id===examId) : null;
     lastMode = mode; lastExamId = examId;
-    currentCombo = 0; recentTricks = [];
+    currentCombo = 0; recentTricks = []; lastSingleCrossed = null;
     stamina = maxStamina = 140 + (save.physical.staminaLevel - 1) * 30;
     // 検定のミス猶予（連続条件で1ミス即終了をやめる）。アシストでさらに+2。
     examLivesMax = examLives = (mode === 'EXAM') ? (3 + (save.assist ? 2 : 0)) : 0;
@@ -1081,9 +1085,27 @@ function completeRotation() {
     currentRots.push(rope.isCrossed);
     return true;
 }
+function triggerExamClear(exam) {
+    if (!save.passedExams.includes(exam.id)) save.passedExams.push(exam.id);
+    save.totalJumps += exam.reward;
+    gameState = 'CLEAR';                          // 物理を止め、合格の余韻を見せる
+    player.jumpAngle = 0; player.isGrounded = true;
+    rope.isSpinning = false; rope.angle = 0;
+    playSuccess(4, true); playCoin();
+    spawnSpark(player.x, player.y, '#fde047', 36, 3.5);
+    spawnSpark(player.x, player.y, '#34d399', 24, 3);
+    addFloater(player.x, player.y-46, "🎉 合格！", "#34d399", 30);
+    addFloater(player.x, player.y-14, `+${exam.reward.toLocaleString()}`, "#fde047", 20);
+    addShake(4, 12); flashAlpha = Math.max(flashAlpha, 0.18);
+    document.getElementById('trick-name').innerText = "CLEAR!";
+    setStatus("検定合格！ おめでとう！", "emerald");
+    saveGame(); renderExams();
+    setTimeout(() => { stopGame(); openReflectionModal(exam); }, 1300);
+}
 function fail() {
     playFail(); addShake(7, 14); crossStreak = 0;
     rope.isSpinning = false; rope.angle = 0;   // 仕切り直し（連続失敗を防ぐ）
+    lastSingleCrossed = null;                   // あや交互もリセット
     spawnSpark(player.x, player.baseY + 40, '#ef4444', 18, 3);
     if (gameState === 'EXAM') {
         examLives--;
@@ -1171,7 +1193,7 @@ function updateEffects(){
         if(f.life<=0) floaters.splice(i,1);
     }
     if(shake.t>0) shake.t--;
-    if(flashAlpha>0) flashAlpha-=0.08;
+    if(flashAlpha>0) flashAlpha-=0.14;
 }
 function drawEffects(){
     particles.forEach(p=>{
@@ -1246,7 +1268,11 @@ function loop() {
             if (currentRots.length > 0) {
                 let tn = getTrick(currentRots);
                 currentCombo++;
-                if (recentTricks.length && ((tn==="交差跳び"&&recentTricks.slice(-1)[0]==="前跳び")||(tn==="前跳び"&&recentTricks.slice(-1)[0]==="交差跳び"))) tn="あや跳び";
+                // あや跳び＝前⇄交差の交互。直前の単発の開閉と異なれば「あや」とみなし、交互が続くかぎり連続カウントできる
+                const single = currentRots.length === 1;
+                const crossedNow = single ? !!currentRots[0] : null;
+                if (single && lastSingleCrossed !== null && crossedNow !== lastSingleCrossed) tn = "あや跳び";
+                lastSingleCrossed = single ? crossedNow : null;   // 多回転が入ると交互は途切れる
                 recentTricks.push(tn); if(recentTricks.length>20) recentTricks.shift();
 
                 // 連続「全交差」の疲労カウント（開いた回転が混ざればリセット）
@@ -1276,9 +1302,9 @@ function loop() {
                 const isBig = rots >= 2;
                 const col = ROPES[save.equippedRope].color;
                 spawnSpark(player.x, player.y, col, 8 + rots*8, 2 + rots*0.8);
-                if (timing==="PERFECT") { addFloater(player.x, player.y-30, "PERFECT!", "#34d399", 18); flashAlpha=0.25; }
+                if (timing==="PERFECT") { addFloater(player.x, player.y-30, "PERFECT!", "#34d399", 18); flashAlpha=Math.max(flashAlpha,0.14); }
                 addFloater(player.x, player.y-(timing==="PERFECT"?52:30), tn, isBig?"#22d3ee":"#fbbf24", isBig?22:16);
-                if (isBig) { addShake(4+rots*2, 10); freezeFrames = 3 + rots*2; flashAlpha=Math.max(flashAlpha,0.3); }
+                if (isBig) { addShake(4+rots*2, 10); flashAlpha=Math.max(flashAlpha,0.18); }
                 playSuccess(rots, timing==="PERFECT");
                 if (currentCombo>0 && currentCombo%10===0) addFloater(player.x, player.y-70, `${currentCombo} COMBO!`, "#a78bfa", 20);
 
@@ -1290,12 +1316,7 @@ function loop() {
                 if (gameState === 'EXAM') updateExamHud();   // 進捗ゲージを更新
 
                 if (gameState === 'EXAM' && currentExam.check(currentCombo, recentTricks)) {
-                    const passed = currentExam;
-                    save.passedExams.push(passed.id);
-                    save.totalJumps += passed.reward;
-                    playCoin(); addFloater(player.x, player.y-20, "検定合格!", "#34d399", 24); flashAlpha=0.4;
-                    stopGame(); saveGame(); renderExams();
-                    setTimeout(() => openReflectionModal(passed), 350);
+                    triggerExamClear(currentExam);
                 }
             }
             currentRots = []; firstPressAngle = null;
@@ -1911,8 +1932,26 @@ function finishCertificate(exam, reflection) {
 }
 
 // 縦長の合格証書（振り返り＋現実への一歩を焼き込む）
+// 検定ごとの「現実への橋渡し」メッセージ（直前の技に合わせて変える）
+function bridgeMessage(examId) {
+    const M = {
+        ex1: ['まずは外で、前跳びを10回。', 'ゲームと同じリズムで跳べるかな？'],
+        ex2: ['本物の縄で、交差跳びに挑戦。', '手をクロスする形をつくってみよう。'],
+        ex3: ['つぎは本物の縄で、二重跳び。', '高く跳んで、縄を速く2回まわそう。'],
+        ex4: ['外で、あや跳びを続けてみよう。', '「開いて・交差」のリズムが鍵。'],
+        ex5: ['三重跳びや二重交差は大技。', 'まず二重を安定させてから挑もう。'],
+        dan0: ['本物の二重跳びを、5回連続で。', 'ゲームで掴んだリズムを、体で。'],
+        dan1: ['二重跳び10回連続を、本物で。', '足が速く動くか、試してみよう。'],
+        dan2: ['はやぶさ（あや二重）は難関。', '二重が安定したら挑戦してみて。'],
+        dan3: ['三重跳びは一流の証。', '本物で1回跳べたら、大したものだ。'],
+        dan4: ['三重を連続で。もう達人級。', '安全な場所で、無理せずいこう。'],
+        dan5: ['つばめ返しは超高難度。', 'ここまで来たら、君は縄の達人。'],
+        master: ['四重跳びは世界レベル。', 'でも一番大事なのは、跳ぶ楽しさ。'],
+    };
+    return M[examId] || ['つぎは、ほんもののなわとびに', '挑戦しよう！'];
+}
 function generateCertificate(exam, reflection) {
-    const W = 620, H = 760;
+    const W = 620, H = 800;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const c = cv.getContext('2d');
     c.textBaseline = 'alphabetic';
@@ -1967,17 +2006,20 @@ function generateCertificate(exam, reflection) {
         c.fillText('（自分の言葉で、あとで書いてみよう）', 80, boxY+56);
     }
 
-    // 現実への一歩（固定メッセージ）
+    // 現実への一歩（検定ごとのメッセージ）
     const chY = boxY + boxH + 30;
     c.textAlign='center';
+    const bmsg = bridgeMessage(exam.id);
     c.fillStyle = '#fbbf24'; c.font = "bold 17px 'Noto Sans JP', sans-serif";
-    c.fillText('つぎは、ほんもののなわとびに', W/2, chY);
-    c.fillText('挑戦しよう！', W/2, chY+26);
+    c.fillText(bmsg[0], W/2, chY);
+    c.fillText(bmsg[1], W/2, chY+26);
 
-    // ステータス行
-    const sY = chY + 64;
-    c.fillStyle = '#64748b'; c.font = "12px 'Noto Sans JP', sans-serif";
-    c.fillText(`称号：${getRankFull(save.lifetimeJumps)}　／　累計 ${save.lifetimeJumps.toLocaleString()} 回`, W/2, sY);
+    // ステータス行（称号・累計を大きく見せる。上のメッセージと一行あける）
+    const sY = chY + 84;
+    c.fillStyle = '#fde047'; c.font = "900 22px 'Noto Sans JP', sans-serif";
+    c.fillText(`称号　${getRankFull(save.lifetimeJumps)}`, W/2, sY);
+    c.fillStyle = '#cbd5e1'; c.font = "bold 16px 'Noto Sans JP', sans-serif";
+    c.fillText(`累計 ${save.lifetimeJumps.toLocaleString()} 回`, W/2, sY+28);
 
     // 日付・署名（内枠線に重ならないよう余白を確保）
     const d = new Date();
