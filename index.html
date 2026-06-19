@@ -159,6 +159,7 @@
 
             <!-- タブ1: 育成 & 装備 -->
             <div id="tab-content-training" class="space-y-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10">
+                <div id="daily-box" class="bg-slate-900 border border-amber-800/50 rounded-xl p-4 shadow-lg"></div>
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
                     <h3 class="text-xs font-black text-slate-500 tracking-widest border-b border-slate-800 pb-2 mb-3">PHYSICAL TRAINING</h3>
                     <div class="space-y-2">
@@ -218,9 +219,13 @@
             <!-- タブ2: 検定 -->
             <div id="tab-content-exams" class="hidden space-y-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10">
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
-                    <h3 class="text-xs font-black text-slate-500 tracking-widest border-b border-slate-800 pb-2 mb-3">OFFICIAL EXAMS</h3>
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-3">
+                        <h3 class="text-xs font-black text-slate-500 tracking-widest">OFFICIAL EXAMS</h3>
+                        <button onclick="openReflectionsGallery()" class="bg-slate-800 hover:bg-emerald-900/70 border border-slate-700 text-emerald-300 text-[10px] font-bold py-1 px-2 rounded transition-all">📔 振り返りの記録</button>
+                    </div>
                     <p class="text-[10px] text-slate-400 leading-relaxed mb-4">
-                        お題を達成するとクリア。引っかかるか、停止すると失敗になります。<br>
+                        お題を達成するとクリア。<span class="text-emerald-400">級位</span>は自由に挑戦可。<span class="text-amber-400">段位</span>以降は前の段に合格すると解放。<br>
+                        ミスは<span class="text-rose-400 font-bold">♥（ライフ）</span>のぶんだけ耐えられます（アシストONでさらに+2）。<br>
                         <span class="text-yellow-400">※検定中はJumpsを獲得できません。</span>
                     </p>
                     <div class="space-y-3" id="exam-list"></div>
@@ -252,6 +257,28 @@
         </div>
     </div>
 
+    <!-- 振り返り入力モーダル（検定合格時） -->
+    <div id="reflect-modal" class="fixed inset-0 z-[115] flex items-center justify-center bg-black/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border-2 border-amber-500/60 p-6 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-200" id="reflect-modal-content">
+            <div class="text-center mb-4">
+                <div class="text-3xl mb-1">💮</div>
+                <h3 id="reflect-title" class="text-lg font-black text-amber-300 tracking-wider">検定合格！</h3>
+                <p class="text-[11px] text-slate-400 mt-1">合格証書に、あなたの言葉を入れよう。</p>
+            </div>
+            <label class="block text-xs font-bold text-slate-200 mb-1.5">さっき、何を意識していた？</label>
+            <textarea id="reflect-input" maxlength="60" rows="2" placeholder="例：縄を回す手を、いつもより速く動かした"
+                class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none"></textarea>
+            <div class="text-[9px] text-slate-500 text-right mt-0.5"><span id="reflect-count">0</span> / 60文字</div>
+            <div class="bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-2.5 mt-2 mb-4">
+                <p class="text-[10px] text-emerald-300 leading-relaxed">
+                    🪢 証書には「<span class="font-bold">つぎは、ほんもののなわとびに挑戦しよう！</span>」というメッセージも入ります。
+                </p>
+            </div>
+            <button onclick="submitReflection()" class="control-btn w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-2.5 rounded-lg text-sm transition-all mb-2">📜 合格証書をつくる</button>
+            <button onclick="skipReflection()" class="control-btn w-full bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">書かずに証書をつくる</button>
+        </div>
+    </div>
+
     <!-- 結果シェアモーダル -->
     <div id="share-modal" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
         <div class="bg-slate-800 border border-slate-600 p-5 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-200" id="share-modal-content">
@@ -265,6 +292,19 @@
             </div>
             <button id="webshare-btn" onclick="webShareCard()" class="hidden control-btn w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2.5 rounded-lg text-sm transition-all mb-2">📤 他のアプリでシェア</button>
             <button onclick="closeShareModal()" class="control-btn w-full bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
+        </div>
+    </div>
+
+    <!-- 振り返りの記録（ギャラリー） -->
+    <div id="gallery-modal" class="fixed inset-0 z-[112] flex items-center justify-center bg-black/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border border-slate-600 p-5 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-200 max-h-[80vh] flex flex-col" id="gallery-modal-content">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-black text-emerald-300 tracking-wider">📔 振り返りの記録</h3>
+                <span id="gallery-count" class="text-[10px] text-slate-400 font-bold"></span>
+            </div>
+            <p class="text-[10px] text-slate-400 mb-3">検定合格のときに書いた「意識したこと」の記録です。読み返すと、自分の上達が見えてきます。</p>
+            <div id="gallery-list" class="space-y-2 overflow-y-auto flex-1 pr-1"></div>
+            <button onclick="closeReflectionsGallery()" class="control-btn w-full mt-3 bg-slate-700/60 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-lg text-xs transition-all">閉じる</button>
         </div>
     </div>
 
@@ -377,7 +417,10 @@ const DEFAULT_SAVE = {
     physical: { jumpLevel: 1, staminaLevel: 1, armLevel: 1 },
     unlockedRopes: ['vinyl'], equippedRope: 'vinyl', passedExams: [],
     unlockedStages: ['gym'], equippedStage: 'gym',
-    seenTutorial: false, assist: false
+    seenTutorial: false, assist: false,
+    prestige: 0,                 // 周回数（修行の重み）
+    daily: { date: '', cleared: false, progress: 0 },  // 日替わりミッション
+    reflections: []              // 検定合格時の「意識したこと」の記録
 };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
@@ -397,19 +440,107 @@ const STAGES = {
 };
 
 const EXAMS = [
-    { id:'ex1', title:'5級: 前跳び10回', desc:'基本。前跳びを連続10回成功させよ。', reward:600, check:(c,t)=>c>=10 },
-    { id:'ex2', title:'4級: 交差への誘い', desc:'交差・あや跳びを累計3回含む、連続15回を達成。', reward:1800, check:(c,t)=>c>=15 && t.filter(x=>x.includes('交差')||x.includes('あや')).length>=3 },
-    { id:'ex3', title:'3級: 滞空の境地', desc:'二重跳びを1回成功させよ。（跳躍力と腕力が必要）', reward:5000, check:(c,t)=>t.includes('二重跳び') },
-    { id:'ex4', title:'2級: あや跳びマニア', desc:'あや跳びを連続で5回成功させよ。', reward:9000, check:(c,t)=>t.slice(-5).every(x=>x==='あや跳び')&&t.length>=5 },
-    { id:'ex5', title:'1級: 重力からの解放', desc:'三重跳び系、または二重交差跳びを成功させよ。', reward:22000, check:(c,t)=>t.some(x=>['三重跳び','つばめ(三重あや)','三重交差跳び','二重交差跳び'].includes(x)) }
+    // ── 級（きゅう）── 数字が小さいほど難しい
+    { id:'ex1', tier:'級', title:'5級: 前跳び10回', desc:'基本。前跳びを連続10回成功させよ。', reward:600, check:(c,t)=>c>=10 },
+    { id:'ex2', tier:'級', title:'4級: 交差への誘い', desc:'交差・あや跳びを累計3回含む、連続15回を達成。', reward:1800, check:(c,t)=>c>=15 && t.filter(x=>x.includes('交差')||x.includes('あや')).length>=3 },
+    { id:'ex3', tier:'級', title:'3級: 滞空の境地', desc:'二重跳びを1回成功させよ。（跳躍力と腕力が必要）', reward:5000, check:(c,t)=>t.includes('二重跳び') },
+    { id:'ex4', tier:'級', title:'2級: あや跳びマニア', desc:'あや跳びを連続で5回成功させよ。', reward:9000, check:(c,t)=>t.slice(-5).every(x=>x==='あや跳び')&&t.length>=5 },
+    { id:'ex5', tier:'級', title:'1級: 重力からの解放', desc:'三重跳び系、または二重交差跳びを成功させよ。', reward:22000, check:(c,t)=>t.some(x=>['三重跳び','つばめ(三重あや)','三重交差跳び','二重交差跳び'].includes(x)) },
+    // ── 段（だん）── 級1級の先。連続性と総合力が問われる
+    { id:'dan1', tier:'段', title:'初段: 二重の安定', desc:'二重跳びを連続で10回成功させよ。', reward:40000,
+      check:(c,t)=>t.length>=10 && t.slice(-10).every(x=>x==='二重跳び') },
+    { id:'dan2', tier:'段', title:'弐段: はやぶさの舞', desc:'はやぶさ（あや二重）を連続で6回成功させよ。', reward:70000,
+      check:(c,t)=>t.length>=6 && t.slice(-6).every(x=>x==='はやぶさ(あや二重)') },
+    { id:'dan3', tier:'段', title:'参段: 三重跳びの衝撃', desc:'三重跳びを連続で4回成功させよ。（レインボー級の装備推奨）', reward:120000,
+      check:(c,t)=>t.length>=4 && t.slice(-4).every(x=>x==='三重跳び') },
+    { id:'dan4', tier:'段', title:'四段: 連続三重', desc:'三重跳び系を連続で6回成功させよ。', reward:200000,
+      check:(c,t)=>t.length>=6 && t.slice(-6).every(x=>['三重跳び','つばめ(三重あや)','三重交差跳び'].includes(x)) },
+    { id:'dan5', tier:'段', title:'五段: つばめ返し', desc:'つばめ（三重あや）または三重交差跳びを連続で4回成功させよ。', reward:350000,
+      check:(c,t)=>t.length>=4 && t.slice(-4).every(x=>['つばめ(三重あや)','三重交差跳び'].includes(x)) },
+    // ── 皆伝（かいでん）── 最終試験
+    { id:'master', tier:'皆伝', title:'免許皆伝: 人間卒業', desc:'四重跳び以上を成功させよ。常人には到達不能の領域。', reward:1000000,
+      check:(c,t)=>t.some(x=>/^[四五六七八九]重跳び$/.test(x) || (/^\d+重跳び$/.test(x))) }
 ];
+
+// ==========================================
+// 📅 日替わりミッション（1〜2分で終わる「今日の課題」。やった日だけ得する）
+// ==========================================
+const DAILY_MISSIONS = [
+    { id:'d_front',  label:'前跳びを30回成功',        reward:500,  match:(tn)=>tn==='前跳び',   need:30 },
+    { id:'d_cross',  label:'交差跳びを15回成功',       reward:800,  match:(tn)=>tn==='交差跳び', need:15 },
+    { id:'d_aya',    label:'あや跳びを10回成功',       reward:1200, match:(tn)=>tn==='あや跳び', need:10 },
+    { id:'d_double', label:'二重跳びを8回成功',        reward:2000, match:(tn)=>tn==='二重跳び', need:8  },
+    { id:'d_combo',  label:'1回の練習で20コンボ達成',  reward:1500, match:null,                  need:20, combo:true },
+    { id:'d_any',    label:'なわとびを合計50回成功',   reward:600,  match:()=>true,              need:50 }
+];
+function todayKey(){ const d = new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+function pickDailyForToday(){
+    const key = todayKey();
+    let hash = 0; for (let i=0;i<key.length;i++) hash = (hash*31 + key.charCodeAt(i)) >>> 0;
+    return DAILY_MISSIONS[hash % DAILY_MISSIONS.length];
+}
+function refreshDaily(){
+    const key = todayKey();
+    if (!save.daily || save.daily.date !== key) save.daily = { date: key, cleared: false, progress: 0 };
+}
+function currentDaily(){ return pickDailyForToday(); }
+function updateDailyProgress(tn, combo){
+    if (gameState !== 'PRACTICE') return;   // 検定中はカウントしない
+    refreshDaily();
+    if (save.daily.cleared) return;
+    const m = currentDaily();
+    if (m.combo) save.daily.progress = Math.max(save.daily.progress, combo);
+    else if (m.match && m.match(tn)) save.daily.progress++;
+    if (save.daily.progress >= m.need) {
+        const reward = Math.round(m.reward * gainMultiplier());
+        save.daily.cleared = true;
+        save.totalJumps += reward;
+        addFloater(player.x, player.y-70, `今日のミッション達成！ +${reward.toLocaleString()}`, "#fde047", 20);
+        playCoin();
+        setStatus(`🎌 今日のミッション達成！ +${reward.toLocaleString()} Jumps`, "gold");
+    }
+    saveGame();
+    renderDaily();
+}
+function renderDaily(){
+    const box = document.getElementById('daily-box');
+    if (!box) return;
+    refreshDaily();
+    const m = currentDaily();
+    const done = save.daily.cleared;
+    const prog = Math.min(save.daily.progress, m.need);
+    const pct = Math.round((prog / m.need) * 100);
+    const shownReward = Math.round(m.reward * gainMultiplier());
+    box.innerHTML = `
+        <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] font-black tracking-wider ${done?'text-emerald-400':'text-amber-400'}">📅 今日のミッション</span>
+            <span class="text-[10px] font-bold ${done?'text-emerald-400':'text-slate-400'}">${done?'達成 ✅':'+'+shownReward.toLocaleString()+' J'}</span>
+        </div>
+        <p class="text-[11px] text-slate-200 font-bold mb-1.5">${m.label}</p>
+        <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full ${done?'bg-emerald-500':'bg-amber-500'} transition-all" style="width:${pct}%"></div>
+        </div>
+        <div class="text-[9px] text-slate-500 mt-1 text-right">${prog} / ${m.need}</div>
+        ${done?'':'<div class="text-[9px] text-slate-500 mt-0.5">※「練習」モードでカウント。気が向いた日に、やった分だけ。</div>'}
+    `;
+}
 
 const RANKS = [
     { m:0,n:'見習い' }, { m:100,n:'初心者' }, { m:400,n:'前跳び名人' },
     { m:1000,n:'校庭の星' }, { m:3000,n:'縄の求道者' }, { m:8000,n:'師範代' },
-    { m:20000,n:'達人' }, { m:50000,n:'マスター' }
+    { m:20000,n:'達人' }, { m:50000,n:'マスター' }, { m:120000,n:'縄聖' },
+    { m:300000,n:'重力の支配者' }, { m:800000,n:'伝説' }
 ];
 function getRank(j){ return [...RANKS].reverse().find(r=>j>=r.m).n; }
+// 周回数を冠したランク表示（例：達人〔二周目〕）
+function getRankFull(j){
+    const base = getRank(j);
+    const p = save.prestige || 0;
+    if (p <= 0) return base;
+    const kanji = ['','二','三','四','五','六','七','八','九','十'];
+    const label = p < kanji.length ? kanji[p] + '周目' : (p+1) + '周目';
+    return `${base}〔${label}〕`;
+}
 
 function getCost(type, lv) {
     if (lv >= 10) return Infinity;
@@ -427,17 +558,44 @@ function loadGame() {
             if (!save.unlockedRopes.includes('vinyl')) save.unlockedRopes = ['vinyl'];
             if (!Array.isArray(save.unlockedStages) || !save.unlockedStages.includes('gym')) save.unlockedStages = ['gym', ...(Array.isArray(save.unlockedStages)?save.unlockedStages.filter(x=>x!=='gym'):[])];
             if (!STAGES[save.equippedStage]) save.equippedStage = 'gym';
+            if (typeof save.prestige !== 'number') save.prestige = 0;
+            if (!save.daily || typeof save.daily !== 'object') save.daily = { date:'', cleared:false, progress:0 };
+            if (!Array.isArray(save.reflections)) save.reflections = [];
         } catch(e) {}
     }
+    refreshDaily();      // 日付が変わっていれば今日のミッションを更新
     updateAssistBtn();
     updateUI();
 }
 function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); updateUI(); }
+
+// 全検定クリア後の「再入門（修行の重み）」。検定・強化・装備をリセットして周回数を上げる。
+function tryPrestige() {
+    if (!EXAMS.every(e => save.passedExams.includes(e.id))) return;
+    const next = (save.prestige || 0) + 1;
+    const bonusPct = Math.round(next * 40);
+    showModal("再入門（修行の重み）",
+        `${next}周目に入ります。<br>検定の合格・強化レベル・ロープ・ステージ・<span class="text-yellow-400 font-bold">Jumpsもすべて0に戻り</span>、縄が重くなります。<br>その代わり、<span class="text-emerald-400 font-bold">Jumpsの獲得量が+${bonusPct}%</span>に増え、手首の修行リングが増えます。（累計回数とベストコンボ、振り返りの記録は引き継ぎます）<br>それでも、また前跳びから挑みますか？`,
+        true, () => {
+            save.prestige = next;
+            save.passedExams = [];
+            save.totalJumps = 0;                          // 本当に積み上げ直す
+            save.physical = { jumpLevel:1, staminaLevel:1, armLevel:1 };
+            save.unlockedRopes = ['vinyl']; save.equippedRope = 'vinyl';
+            save.unlockedStages = ['gym']; save.equippedStage = 'gym';
+            stopGame();
+            maxStamina = stamina = 140;
+            playSuccess(4, true);
+            saveGame(); renderShop(); renderStages(); renderExams();
+            showModal(`${next}周目、開始`, `重りを背負った身体で、また前跳びから。<br>でも前より<span class="text-emerald-400 font-bold">${bonusPct}%多く</span>稼げる。一度できたことを、もっと深く。焦らず、ていねいに積み上げよう。`);
+        });
+}
 function confirmReset() {
-    showModal("データの初期化", "全ての特訓記録（Jumps、強化レベル、ロープ、検定）をリセットして、最初からやり直しますか？", true, () => {
+    showModal("データの初期化", "全ての特訓記録（Jumps、強化レベル、ロープ、検定、周回）をリセットして、最初からやり直しますか？", true, () => {
         localStorage.removeItem(SAVE_KEY);
         save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
-        stopGame(); updateAssistBtn(); saveGame(); renderShop(); renderStages(); renderExams();
+        refreshDaily();
+        stopGame(); updateAssistBtn(); saveGame(); renderShop(); renderStages(); renderExams(); renderDaily();
     });
 }
 
@@ -448,6 +606,7 @@ let gameState = 'IDLE';
 let lastMode = 'PRACTICE', lastExamId = null, currentExam = null;
 let currentCombo = 0, recentTricks = [];
 let maxStamina = 140, stamina = 140;
+let examLives = 0, examLivesMax = 0; // 検定中のミス猶予
 let recoverEndTime = 0; // 休憩終了時刻（ミリ秒）
 let tutorialHintLeft = 0; // 初回チュートリアル：あと何回ヒント表示するか
 
@@ -471,21 +630,33 @@ function updateAssistBtn() {
 
 function startGame(mode, examId = null) {
     initAudio();
+    // 段位検定のロック確認（前の段位に合格していないと挑戦不可）
+    if (mode === 'EXAM' && examId) {
+        const danOrder = EXAMS.filter(e => e.tier === '段' || e.tier === '皆伝');
+        const target = EXAMS.find(e => e.id === examId);
+        const di = danOrder.indexOf(target);
+        if (di > 0 && !save.passedExams.includes(danOrder[di-1].id)) {
+            showModal("未解放", "前の段位に合格すると、この検定が解放されます。");
+            return;
+        }
+    }
     gameState = mode;
     currentExam = examId ? EXAMS.find(e=>e.id===examId) : null;
     lastMode = mode; lastExamId = examId;
     currentCombo = 0; recentTricks = [];
     stamina = maxStamina = 140 + (save.physical.staminaLevel - 1) * 30;
+    // 検定のミス猶予（連続条件で1ミス即終了をやめる）。アシストでさらに+2。
+    examLivesMax = examLives = (mode === 'EXAM') ? (3 + (save.assist ? 2 : 0)) : 0;
 
     if (!save.seenTutorial && mode === 'PRACTICE') { tutorialHintLeft = 8; save.seenTutorial = true; saveGame(); }
 
     document.getElementById('idle-overlay').classList.add('opacity-0', 'pointer-events-none');
     document.getElementById('exhausted-overlay').classList.add('opacity-0', 'pointer-events-none');
     const badge = document.getElementById('mode-badge');
-    badge.innerText = mode === 'PRACTICE' ? 'FREE PRACTICE' : `EXAM: ${currentExam.title}`;
+    badge.innerText = mode === 'PRACTICE' ? 'FREE PRACTICE' : `${currentExam.title.split(':')[0]}　${'♥'.repeat(examLives)}`;
     badge.className = `text-[9px] font-bold px-2 py-0.5 rounded absolute top-2 left-1/2 -translate-x-1/2 ${mode==='PRACTICE'?'bg-emerald-900 text-emerald-300':'bg-red-900 text-red-300'}`;
     document.getElementById('trick-name').innerText = "JUMP!";
-    setStatus("緑のタイミングで「回す」！", "slate");
+    setStatus(mode === 'EXAM' ? `緑で「回す」！ ミスは♥×${examLives}まで耐えられます` : "緑のタイミングで「回す」！", "slate");
 
     document.getElementById('stop-btn').disabled = false;
     document.getElementById('stop-btn').classList.remove('opacity-50', 'cursor-not-allowed');
@@ -607,15 +778,65 @@ function renderStages() {
     document.getElementById('stage-list').innerHTML = h;
 }
 function renderExams() {
+    // 段位は「前の検定をクリアすると次が解放」される。級は最初から全部挑戦可。
+    const danOrder = EXAMS.filter(e => e.tier === '段' || e.tier === '皆伝');
+    function isLocked(e) {
+        const i = danOrder.indexOf(e);
+        if (i <= 0) return false;                 // 級＆初段は常に解放
+        return !save.passedExams.includes(danOrder[i-1].id);
+    }
+    const tierMeta = {
+        '級':   { label: '級位 — KYU', color: 'text-emerald-400', bar: 'border-emerald-700' },
+        '段':   { label: '段位 — DAN', color: 'text-amber-400',   bar: 'border-amber-700' },
+        '皆伝': { label: '免許皆伝 — MASTER', color: 'text-fuchsia-400', bar: 'border-fuchsia-700' }
+    };
     let h = '';
+    // 全検定クリア → 再入門（修行の重み）バナー
+    const allCleared = EXAMS.every(e => save.passedExams.includes(e.id));
+    if (allCleared) {
+        const next = (save.prestige || 0) + 1;
+        h += `<div class="p-4 rounded-xl border-2 border-amber-500 bg-gradient-to-br from-amber-950/40 to-slate-950 mb-3 text-center">
+                <div class="text-amber-300 font-black text-sm mb-1">🥋 全検定 制覇！</div>
+                <p class="text-[10px] text-slate-300 leading-relaxed mb-3">
+                    重りを背負って、もう一段上の修行へ。<br>
+                    <span class="text-amber-400 font-bold">${next}周目</span>に入ると、検定・強化・装備・<span class="text-yellow-400 font-bold">Jumpsもすべて0に戻り</span>、縄が重くなります。<br>
+                    かわりに<span class="text-emerald-400 font-bold">Jumpsの獲得量が+${next*40}%</span>に増え、称号に〔周目〕、手首に修行リングが刻まれます。
+                </p>
+                <button onclick="tryPrestige()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-lg transition-all shadow-md">⚖️ ${next}周目に入る（再入門）</button>
+              </div>`;
+    }
+    let lastTier = null;
     EXAMS.forEach(e => {
-        const p = save.passedExams.includes(e.id);
-        const b = p ? `<span class="bg-emerald-900/50 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-700">💮 合格</span>` :
-                      `<button onclick="startGame('EXAM', '${e.id}')" class="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded transition-all shadow-md">挑戦する</button>`;
-        h += `<div class="p-3 rounded-lg border ${p?'border-emerald-900 bg-emerald-950/20':'border-slate-800 bg-slate-950'}">
-                <div class="flex justify-between items-start mb-1"><h4 class="font-bold text-xs text-white">${e.title}</h4>${b}</div>
-                <p class="text-[10px] text-slate-400 mb-1.5">${e.desc}</p>
-                <div class="text-[9px] text-slate-500">報酬: <span class="text-yellow-400 font-bold">${e.reward} Jumps</span></div></div>`;
+        if (e.tier !== lastTier) {
+            const m = tierMeta[e.tier];
+            h += `<div class="pt-2 pb-1 mt-1 border-b ${m.bar}"><span class="text-[10px] font-black tracking-widest ${m.color}">${m.label}</span></div>`;
+            lastTier = e.tier;
+        }
+        const passed = save.passedExams.includes(e.id);
+        const locked = !passed && isLocked(e);
+        const isMaster = e.tier === '皆伝';
+
+        let btn;
+        if (passed) {
+            btn = `<span class="bg-emerald-900/50 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-700 whitespace-nowrap">💮 合格</span>`;
+        } else if (locked) {
+            btn = `<span class="bg-slate-800 text-slate-500 text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">🔒 未解放</span>`;
+        } else {
+            const cls = isMaster
+                ? 'bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500'
+                : (e.tier === '段' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-red-600 hover:bg-red-500');
+            btn = `<button onclick="startGame('EXAM', '${e.id}')" class="${cls} text-white text-[10px] font-bold px-2 py-1 rounded transition-all shadow-md whitespace-nowrap">挑戦する</button>`;
+        }
+
+        const border = passed ? 'border-emerald-900 bg-emerald-950/20'
+                     : locked ? 'border-slate-800/60 bg-slate-950/40 opacity-60'
+                     : isMaster ? 'border-fuchsia-800 bg-fuchsia-950/20'
+                     : 'border-slate-800 bg-slate-950';
+
+        h += `<div class="p-3 rounded-lg border ${border} transition-all">
+                <div class="flex justify-between items-start mb-1 gap-2"><h4 class="font-bold text-xs text-white">${e.title}</h4>${btn}</div>
+                <p class="text-[10px] text-slate-400 mb-1.5">${locked ? '前の段位に合格すると解放されます。' : e.desc}</p>
+                <div class="text-[9px] text-slate-500">報酬: <span class="text-yellow-400 font-bold">${e.reward.toLocaleString()} Jumps</span></div></div>`;
     });
     document.getElementById('exam-list').innerHTML = h;
 }
@@ -624,7 +845,7 @@ function updateUI() {
     const cd = document.getElementById("combo-display");
     cd.innerText = currentCombo;
     document.getElementById("best-combo-display").innerText = save.highCombo;
-    document.getElementById("rank-display").innerText = getRank(save.lifetimeJumps);
+    document.getElementById("rank-display").innerText = getRankFull(save.lifetimeJumps);
     ['jump','arm','stamina'].forEach(t => {
         const lv = save.physical[`${t}Level`];
         document.getElementById(`${t}-lv`).innerText = lv;
@@ -656,9 +877,9 @@ window.addEventListener('resize', resize);
 const player = {
     x: 250, y: 220, baseY: 220, w: 32, h: 70, jumpAngle: 0,
     isGrounded: true, isKneeling: false, kneelTimer: 0, prepProg: 0,
-    getHeight: () => 40 + (save.physical.jumpLevel * 8),
-    // 1周期あたりの進む角度（小さいほど滞空が長い）。アシスト時は更にゆっくり＝猶予UP
-    getSpeed: () => (5.1 - (save.physical.jumpLevel * 0.14)) * (save.assist ? 0.82 : 1)
+    // 周回(prestige)が増えるほど重りで跳びにくくなる：高さは下がり、周期は速くなる(滞空が縮む)
+    getHeight: () => (40 + (save.physical.jumpLevel * 8)) * (1 - prestigeWeight()*0.07),
+    getSpeed: () => (5.1 - (save.physical.jumpLevel * 0.14)) * (1 + prestigeWeight()*0.05) * (save.assist ? 0.82 : 1)
 };
 const rope = {
     angle: 0, isSpinning: false, isCrossed: false,
@@ -666,9 +887,14 @@ const rope = {
     getCost: () => {
         const drainMult = 1 - (save.physical.staminaLevel - 1) * 0.04;
         const crossExtra = rope.isCrossed ? 1.25 : 1; // 交差は消耗が大きい
-        return ROPES[save.equippedRope].weightCost * 0.6 * drainMult * crossExtra * (save.assist ? 0.5 : 1);
+        const weight = 1 + prestigeWeight()*0.10;     // 周回ごとに縄が重く＝消耗増
+        return ROPES[save.equippedRope].weightCost * 0.6 * drainMult * crossExtra * weight * (save.assist ? 0.5 : 1);
     }
 };
+// 周回の重み（0,1,2,3…）。上限を設けて理不尽にならないようにする。
+function prestigeWeight() { return Math.min(save.prestige || 0, 5); }
+// 再入門の「見返り」：周回ごとにJumpsの獲得量が増える（重さに見合う成長）。
+function gainMultiplier() { return 1 + (save.prestige || 0) * 0.4; }
 // 交差は腕を組むぶん縄が遅くなる。連続で交差し続けるとさらに失速（疲労）。
 let crossStreak = 0; // 連続「全交差」ジャンプ数
 function crossFactor() {
@@ -688,6 +914,7 @@ function getCharStyle() {
     else if (power >= 8)  { outfit="#10b981"; outfitDark="#065f46"; hair="#ea580c"; accent="#fde047"; }
     else                  { outfit="#059669"; outfitDark="#334155"; hair="#ea580c"; accent="#94a3b8"; }
     return { power, jL, aL, sL, outfit, outfitDark, hair, accent,
+        prestige: prestigeWeight(),
         headband: aL>=4, wrist: aL>=7, cape: sL>=6, capeBig: sL>=10, aura: power>=22, crown: power>=28 };
 }
 let currentRots = [];
@@ -740,12 +967,30 @@ function handleSpin() {
         if (stamina <= 0) triggerExhaust();
     }
 }
+// Space / Enter がフォーカス中の <button> を再クリックしてしまう問題への対策。
+// （これが「Enterでスタミナが回復する」バグの原因：開始/再開ボタンが押された状態で
+//  Enterを押すと startGame/resumeGame が再実行され、stamina が満タンに戻っていた）
 window.addEventListener("keydown", e => {
-    if (e.code === "Space" && !e.repeat) { e.preventDefault(); handleSpin(); }
+    if (e.code === "Space") {
+        e.preventDefault(); // ページスクロール＆ボタン再発火の両方を抑止
+        if (!e.repeat) handleSpin();
+        return;
+    }
+    if (e.code === "Enter") {
+        // フォーカスが残ったボタンをEnterで誤爆させない。ゲーム操作には使わない。
+        const ae = document.activeElement;
+        if (ae && ae.tagName === 'BUTTON') { e.preventDefault(); ae.blur(); }
+        return;
+    }
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.Shift = true;
 });
 window.addEventListener("keyup", e => {
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.Shift = touchCross;
+});
+// 念のため：どのボタンを押しても直後にフォーカスを外し、キー誤爆の余地をなくす
+document.addEventListener('pointerup', e => {
+    const b = e.target.closest && e.target.closest('button');
+    if (b) setTimeout(() => b.blur(), 0);
 });
 
 function completeRotation() {
@@ -760,13 +1005,29 @@ function completeRotation() {
 }
 function fail() {
     playFail(); addShake(7, 14); crossStreak = 0;
+    rope.isSpinning = false; rope.angle = 0;   // 仕切り直し（連続失敗を防ぐ）
     spawnSpark(player.x, player.baseY + 40, '#ef4444', 18, 3);
-    addFloater(player.x, player.y - 10, "ひっかかった！", "#f87171", 22);
-    setStatus("引っかかった！タイミングが遅すぎ", "red");
-    document.getElementById('trick-name').innerText = "FAIL";
     if (gameState === 'EXAM') {
-        setTimeout(() => { showModal("検定不合格...", "足に引っかかりました。緑ゾーンの真ん中を狙って再挑戦！"); stopGame(); }, 300);
+        examLives--;
+        const badge = document.getElementById('mode-badge');
+        if (badge && currentExam) badge.innerText = `${currentExam.title.split(':')[0]}　${'♥'.repeat(Math.max(0,examLives))}`;
+        if (examLives > 0) {
+            // まだ挑戦継続。連続カウントだけリセットして仕切り直し。
+            currentCombo = 0; currentRots = []; recentTricks = []; firstPressAngle = null;
+            addFloater(player.x, player.y - 10, `ミス！ のこり ♥×${examLives}`, "#f87171", 20);
+            setStatus(`ミス…のこり ${examLives}回（連続はリセット、跳び続けてOK）`, "red");
+            document.getElementById('trick-name').innerText = "MISS";
+            updateUI();
+        } else {
+            addFloater(player.x, player.y - 10, "ライフ切れ…", "#f87171", 22);
+            setStatus("ライフを使い切りました", "red");
+            document.getElementById('trick-name').innerText = "FAIL";
+            setTimeout(() => { showModal("検定終了", "ライフを使い切りました。緑ゾーンの真ん中で“ためて→踏み切り”を意識して、もう一度！"); stopGame(); }, 300);
+        }
     } else {
+        addFloater(player.x, player.y - 10, "ひっかかった！", "#f87171", 22);
+        setStatus("引っかかった！タイミングが遅すぎ", "red");
+        document.getElementById('trick-name').innerText = "FAIL";
         currentCombo = 0; currentRots = []; recentTricks = []; firstPressAngle = null;
         updateUI();
     }
@@ -924,9 +1185,10 @@ function loop() {
 
                 if (gameState === 'PRACTICE') {
                     const comboBonus = 1 + Math.min(currentCombo,100)*0.03;
-                    const gain = Math.round(getMult(tn) * ROPES[save.equippedRope].mult * comboBonus * tmult);
+                    const gain = Math.round(getMult(tn) * ROPES[save.equippedRope].mult * comboBonus * tmult * gainMultiplier());
                     save.totalJumps += gain;
                     addFloater(player.x+30, player.y, `+${gain}`, "#fde047", 18);
+                    updateDailyProgress(tn, currentCombo);   // 今日のミッション進捗
                 }
                 save.lifetimeJumps += rots;
                 if (currentCombo > save.highCombo) save.highCombo = currentCombo;
@@ -953,7 +1215,7 @@ function loop() {
                     save.totalJumps += passed.reward;
                     playCoin(); addFloater(player.x, player.y-20, "検定合格!", "#34d399", 24); flashAlpha=0.4;
                     stopGame(); saveGame(); renderExams();
-                    setTimeout(() => openShareModal(`💮 ${passed.title} 合格！`), 350);
+                    setTimeout(() => openReflectionModal(passed), 350);
                 }
             }
             currentRots = []; firstPressAngle = null;
@@ -1020,46 +1282,113 @@ function loop() {
         ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
     }
 
-    // 胴体
-    ctx.fillStyle = player.isGrounded ? cs.outfitDark : cs.outfit;
-    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-12,16,24,40,6) : ctx.fillRect(-12,16,24,40); ctx.fill();
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0,16); ctx.lineTo(0,56); ctx.stroke();
-    ctx.fillStyle = "#1e293b";
+    // ===== 胴体（首・肩のある体型に） =====
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    // 首
+    ctx.strokeStyle = "#f3c98b"; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(0,12); ctx.lineTo(0,18); ctx.stroke();
+    // 胴（少し台形に）
+    const bodyGrad = ctx.createLinearGradient(0,16,0,56);
+    bodyGrad.addColorStop(0, player.isGrounded ? cs.outfit : lighten(cs.outfit,0.12));
+    bodyGrad.addColorStop(1, cs.outfitDark);
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(-11,18); ctx.lineTo(11,18);
+    ctx.quadraticCurveTo(14,20,13,30);
+    ctx.lineTo(11,54); ctx.quadraticCurveTo(11,57,8,57);
+    ctx.lineTo(-8,57); ctx.quadraticCurveTo(-11,57,-11,54);
+    ctx.lineTo(-13,30); ctx.quadraticCurveTo(-14,20,-11,18);
+    ctx.closePath(); ctx.fill();
+    // ジャージのライン（2本＋センター）
+    ctx.strokeStyle = hexAlpha(cs.accent,0.9); ctx.lineWidth=2.4;
+    ctx.beginPath(); ctx.moveTo(0,19); ctx.lineTo(0,55); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(-6,20); ctx.lineTo(-6,52); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(6,20); ctx.lineTo(6,52); ctx.stroke();
+    // 襟
+    ctx.strokeStyle = "#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-6,19); ctx.lineTo(0,23); ctx.lineTo(6,19); ctx.stroke();
+
+    // ===== 脚＋スニーカー（曲線で描く） =====
+    ctx.strokeStyle = "#1e293b"; ctx.lineWidth=7; ctx.lineCap='round';
     if (player.isGrounded) {
-        ctx.fillRect(-9,52,7,18); ctx.fillRect(2,52,7,18);
-        ctx.fillStyle="#f8fafc"; ctx.fillRect(-10,66,10,5); ctx.fillRect(1,66,10,5);
+        const knee = player.isKneeling ? 4 : 0;
+        ctx.beginPath(); ctx.moveTo(-5,55); ctx.quadraticCurveTo(-7,62,-7,67-knee); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(5,55);  ctx.quadraticCurveTo(7,62,7,67-knee);  ctx.stroke();
+        drawSneaker(-11, 67-knee, cs.accent);
+        drawSneaker(2, 67-knee, cs.accent);
     } else {
-        ctx.fillRect(-9,52,7,12); ctx.fillRect(2,52,7,10);
-        ctx.fillStyle="#f8fafc"; ctx.fillRect(-8,62,10,5); ctx.fillRect(3,60,10,5);
+        // 空中：膝をたたんで躍動感
+        ctx.beginPath(); ctx.moveTo(-5,55); ctx.quadraticCurveTo(-11,60,-4,64); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(5,55);  ctx.quadraticCurveTo(2,59,9,60);  ctx.stroke();
+        drawSneaker(-9, 62, cs.accent);
+        drawSneaker(5, 58, cs.accent);
     }
-    // 頭・髪
-    ctx.fillStyle = "#fde68a"; ctx.beginPath(); ctx.arc(0,2,12,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = cs.hair; ctx.beginPath(); ctx.arc(0,-2,13,Math.PI,0); ctx.fill(); ctx.fillRect(-13,-2,26,6);
+
+    // ===== 頭・顔 =====
+    // 顔（卵形＋ほお）
+    ctx.fillStyle = "#fde0a8";
+    ctx.beginPath(); ctx.ellipse(0,2,11.5,12.5,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "rgba(244,114,114,0.25)"; ctx.beginPath(); ctx.arc(6,6,2.4,0,Math.PI*2); ctx.fill();
+    // 髪（頭頂＋もみあげ＋前髪の毛束）
+    ctx.fillStyle = cs.hair;
+    ctx.beginPath(); ctx.arc(0,-1,12.5,Math.PI*1.02,Math.PI*2.02); ctx.fill();
+    ctx.fillRect(-12.5,-1,25,5);
+    ctx.beginPath(); ctx.moveTo(7,-8); ctx.quadraticCurveTo(13,-10,12,-2); ctx.quadraticCurveTo(9,-5,7,-8); ctx.fill(); // 前髪の流れ
+    ctx.fillStyle = hexAlpha("#ffffff",0.18); ctx.beginPath(); ctx.ellipse(-3,-7,5,3,-0.4,0,Math.PI*2); ctx.fill(); // ツヤ
+    // 表情（目・眉・口）— 状態で変化
+    ctx.fillStyle="#0f172a";
+    if (gameState==='EXHAUSTED' || gameState==='RECOVERED') {
+        // ぐったり（>_<）
+        ctx.lineWidth=1.6; ctx.strokeStyle="#0f172a";
+        ctx.beginPath(); ctx.moveTo(2,1); ctx.lineTo(6,3); ctx.moveTo(6,1); ctx.lineTo(2,3); ctx.stroke();
+        ctx.beginPath(); ctx.arc(4,8,1.8,0,Math.PI*2); ctx.stroke();
+    } else {
+        // 真剣な目＋への字眉＋への字口
+        ctx.beginPath(); ctx.ellipse(5,2,1.7,2.3,0,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle="#0f172a"; ctx.lineWidth=1.6;
+        ctx.beginPath(); ctx.moveTo(2.5,-2.2); ctx.lineTo(7.5,-1.2); ctx.stroke(); // 眉
+        ctx.beginPath(); ctx.moveTo(3,8); ctx.lineTo(7,7.4); ctx.stroke();         // 口
+    }
+
     // 冠（最高位）
     if (cs.crown) {
-        ctx.fillStyle = "#fde047";
+        ctx.fillStyle = "#fde047"; ctx.shadowColor="#fde047"; ctx.shadowBlur=8;
         ctx.beginPath();
         ctx.moveTo(-9,-11); ctx.lineTo(-6,-19); ctx.lineTo(-3,-12);
-        ctx.lineTo(0,-20); ctx.lineTo(3,-12); ctx.lineTo(6,-19); ctx.lineTo(9,-11);
-        ctx.closePath(); ctx.fill();
+        ctx.lineTo(0,-21); ctx.lineTo(3,-12); ctx.lineTo(6,-19); ctx.lineTo(9,-11);
+        ctx.closePath(); ctx.fill(); ctx.shadowBlur=0;
+        ctx.fillStyle="#f472b6"; ctx.beginPath(); ctx.arc(0,-15,1.6,0,Math.PI*2); ctx.fill();
     }
-    // ヘッドバンド（腕力）
+    // ヘッドバンド（腕力）＋たなびく結び
     if (cs.headband) {
-        ctx.fillStyle = cs.accent; ctx.fillRect(-13,-4,26,4);
-        ctx.fillRect(-16,-3,5,9); // 結び目
+        ctx.fillStyle = cs.accent; ctx.fillRect(-12.5,-4,25,4.5);
+        const fl = !player.isGrounded ? Math.sin(player.jumpAngle*0.12)*4 : Math.sin(Date.now()*0.006)*1.5;
+        ctx.strokeStyle=cs.accent; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.moveTo(-12,-2); ctx.quadraticCurveTo(-19,0+fl,-23,5+fl*1.3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-12,-1); ctx.quadraticCurveTo(-18,4+fl,-21,10+fl); ctx.stroke();
     }
-    // 腕
-    ctx.fillStyle = "#fde68a";
-    ctx.beginPath(); ctx.ellipse(-14,4+tO,6,12,Math.PI/6,0,Math.PI*2); ctx.fill();
-    // リストバンド（腕力）
-    if (cs.wrist) { ctx.fillStyle = cs.accent; ctx.fillRect(-20,11+tO,11,4); }
-    ctx.fillStyle = "#0f172a"; ctx.fillRect(5,0,3,4);
+
+    // ===== 腕・手（縄の接続点 ±14,32 を維持） =====
+    ctx.strokeStyle = "#f3c98b"; ctx.lineWidth=5.5; ctx.lineCap='round';
     if (rope.isCrossed) {
-        ctx.strokeStyle="#fde68a"; ctx.lineWidth=5; ctx.lineCap='round';
-        ctx.beginPath(); ctx.moveTo(-10,24); ctx.lineTo(14,34); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(10,24); ctx.lineTo(-14,34); ctx.stroke();
+        // 前で大きくクロス
+        ctx.beginPath(); ctx.moveTo(-9,22); ctx.quadraticCurveTo(2,26,12,32); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(9,22);  ctx.quadraticCurveTo(-2,26,-12,32); ctx.stroke();
+        if (cs.wrist){ ctx.strokeStyle=cs.accent; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(10,30); ctx.lineTo(13,33); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-10,30); ctx.lineTo(-13,33); ctx.stroke(); }
+        ctx.fillStyle="#f3c98b"; ctx.beginPath(); ctx.arc(12,32,3,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(-12,32,3,0,Math.PI*2); ctx.fill();
     } else {
-        ctx.fillStyle="#fde68a"; ctx.fillRect(10,24,7,5); ctx.fillRect(-17,24,7,5);
+        // 脇をしめて手首は腰の横（なわとびフォーム）
+        ctx.beginPath(); ctx.moveTo(-9,22); ctx.quadraticCurveTo(-15,26,-14,32); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(9,22);  ctx.quadraticCurveTo(15,26,14,32);  ctx.stroke();
+        if (cs.wrist){ ctx.strokeStyle=cs.accent; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(-16,29); ctx.lineTo(-13,32); ctx.stroke(); ctx.beginPath(); ctx.moveTo(16,29); ctx.lineTo(13,32); ctx.stroke(); }
+        ctx.fillStyle="#f3c98b"; ctx.beginPath(); ctx.arc(-14,32,3,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(14,32,3,0,Math.PI*2); ctx.fill();
+    }
+    // 周回(prestige)の重りバンド：手首に金の輪。周回数ぶん太くなる。
+    if (cs.prestige > 0) {
+        const lw = 3 + Math.min(cs.prestige,5);
+        ctx.strokeStyle = '#d4a72c'; ctx.lineWidth = lw; ctx.lineCap = 'butt';
+        const lx = rope.isCrossed ? 12 : 14, rx = rope.isCrossed ? -12 : -14;
+        ctx.beginPath(); ctx.moveTo(lx-2,30); ctx.lineTo(lx+2,34); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(rx-2,34); ctx.lineTo(rx+2,30); ctx.stroke();
     }
     ctx.restore();
 
@@ -1248,6 +1577,28 @@ function hexAlpha(hex, a) {
     const n = parseInt(hex.slice(1),16);
     return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
 }
+// 色を明るく寄せる（胴体のハイライト用）。rainbowなど非hexはそのまま返す。
+function lighten(hex, amt) {
+    if (typeof hex !== 'string' || hex[0] !== '#' || hex.length < 7) return hex;
+    const n = parseInt(hex.slice(1),16);
+    const r = Math.min(255, ((n>>16)&255) + Math.round(255*amt));
+    const g = Math.min(255, ((n>>8)&255) + Math.round(255*amt));
+    const b = Math.min(255, (n&255) + Math.round(255*amt));
+    return `rgb(${r},${g},${b})`;
+}
+// スニーカー（ソール＋甲＋アクセントの3パーツ）。ローカル座標で左上(x,y)起点。
+function drawSneaker(x, y, accent) {
+    ctx.save();
+    ctx.fillStyle = "#f8fafc";
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x+9, y); ctx.quadraticCurveTo(x+11, y, x+11, y+3);
+    ctx.lineTo(x+11, y+5); ctx.lineTo(x-1, y+5); ctx.quadraticCurveTo(x-1, y+2, x, y);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = accent && accent[0]==='#' ? accent : "#22d3ee";
+    ctx.fillRect(x-1, y+5, 12, 1.6);          // ソールのライン
+    ctx.fillRect(x+3, y+1, 1.6, 4);           // 甲のアクセント
+    ctx.restore();
+}
 
 // 縦タイミングゲージ：キャラクターの脇に表示。
 //  グレー(下)=予備動作（接地してためている区間）。ポインタがここを上りきると…
@@ -1390,6 +1741,193 @@ function drawCardCharacter(c, x, y, s) {
     c.restore();
 }
 
+// ==========================================
+// 📜 振り返り → 合格証書
+// ==========================================
+let pendingExam = null;
+
+function openReflectionModal(exam) {
+    initAudio();
+    pendingExam = exam;
+    const inp = document.getElementById('reflect-input');
+    inp.value = '';
+    document.getElementById('reflect-count').innerText = '0';
+    document.getElementById('reflect-title').innerText = `${exam.title.split(':')[0]} 合格！`;
+    const m = document.getElementById('reflect-modal'), ct = document.getElementById('reflect-modal-content');
+    m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
+    setTimeout(()=>inp.focus(), 150);
+}
+function closeReflectionModal() {
+    const m = document.getElementById('reflect-modal'), ct = document.getElementById('reflect-modal-content');
+    m.classList.add('opacity-0','pointer-events-none'); ct.classList.remove('scale-100'); ct.classList.add('scale-95');
+}
+// ===== 振り返りの記録（ギャラリー） =====
+function renderReflections() {
+    const list = document.getElementById('gallery-list');
+    const cnt = document.getElementById('gallery-count');
+    if (!list) return;
+    const refs = Array.isArray(save.reflections) ? save.reflections : [];
+    if (cnt) cnt.innerText = `${refs.length} 件`;
+    if (refs.length === 0) {
+        list.innerHTML = `<p class="text-[11px] text-slate-500 text-center py-8">まだ記録はありません。<br>検定に合格すると、ここに「意識したこと」が貯まります。</p>`;
+        return;
+    }
+    list.innerHTML = refs.slice().reverse().map(r => {
+        const grade = (r.title||'').split(':')[0].trim();
+        const cycle = r.prestige > 0 ? `<span class="text-[9px] text-amber-400 font-bold">〔${r.prestige+1}周目〕</span>` : '';
+        const body = r.text ? `<p class="text-[12px] text-slate-100 mt-1 leading-relaxed">🪢 ${escapeHtml(r.text)}</p>` : `<p class="text-[11px] text-slate-500 mt-1 italic">（未記入）</p>`;
+        return `<div class="p-2.5 rounded-lg border border-slate-700 bg-slate-950">
+            <div class="flex justify-between items-center">
+                <span class="text-[11px] font-black text-emerald-400">💮 ${escapeHtml(grade)} ${cycle}</span>
+                <span class="text-[9px] text-slate-500">${escapeHtml(r.date||'')}</span>
+            </div>${body}</div>`;
+    }).join('');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function openReflectionsGallery() {
+    renderReflections();
+    const m = document.getElementById('gallery-modal'), ct = document.getElementById('gallery-modal-content');
+    m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
+}
+function closeReflectionsGallery() {
+    const m = document.getElementById('gallery-modal'), ct = document.getElementById('gallery-modal-content');
+    m.classList.add('opacity-0','pointer-events-none'); ct.classList.remove('scale-100'); ct.classList.add('scale-95');
+}
+document.addEventListener('input', e => {
+    if (e.target && e.target.id === 'reflect-input') {
+        document.getElementById('reflect-count').innerText = String(e.target.value.length);
+    }
+});
+function submitReflection() {
+    const txt = (document.getElementById('reflect-input').value || '').trim();
+    finishCertificate(pendingExam, txt);
+}
+function skipReflection() {
+    finishCertificate(pendingExam, '');
+}
+function finishCertificate(exam, reflection) {
+    closeReflectionModal();
+    // 振り返りを記録として残す（周回しても消えない・あとで見返せる）
+    if (!Array.isArray(save.reflections)) save.reflections = [];
+    const d = new Date();
+    save.reflections.push({
+        examId: exam.id, title: exam.title, text: (reflection || '').trim(),
+        date: `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`, prestige: save.prestige || 0
+    });
+    saveGame();
+    if (typeof renderReflections === 'function') renderReflections();
+    const cv = generateCertificate(exam, reflection);
+    shareDataURL = cv.toDataURL('image/png');
+    document.getElementById('share-img').src = shareDataURL;
+    document.getElementById('share-title').innerText = `${exam.title.split(':')[0]} 合格証書`;
+    cv.toBlob(b => { shareBlob = b; }, 'image/png');
+    let canFileShare = false;
+    try { canFileShare = !!(navigator.canShare && navigator.canShare({ files: [new File([], 'x.png', {type:'image/png'})] })); } catch(e) { canFileShare = false; }
+    document.getElementById('webshare-btn').classList.toggle('hidden', !canFileShare);
+    const m = document.getElementById('share-modal'), ct = document.getElementById('share-modal-content');
+    m.classList.remove('opacity-0','pointer-events-none'); ct.classList.remove('scale-95'); ct.classList.add('scale-100');
+}
+
+// 縦長の合格証書（振り返り＋現実への一歩を焼き込む）
+function generateCertificate(exam, reflection) {
+    const W = 620, H = 760;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    c.textBaseline = 'alphabetic';
+
+    // 背景（深い藍）
+    const g = c.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0b1326'); g.addColorStop(1,'#0e1a2f');
+    c.fillStyle = g; c.fillRect(0,0,W,H);
+
+    // 金の二重枠
+    c.strokeStyle = '#d4a72c'; c.lineWidth = 5; c.strokeRect(18,18,W-36,H-36);
+    c.strokeStyle = 'rgba(212,167,44,0.45)'; c.lineWidth = 1.5; c.strokeRect(28,28,W-56,H-56);
+
+    c.textAlign = 'center';
+
+    // 冠飾り
+    c.font = "40px 'Noto Sans JP', sans-serif";
+    c.fillText('🎖️', W/2, 92);
+
+    // タイトル
+    c.fillStyle = '#facc15'; c.font = "900 17px 'Orbitron', sans-serif";
+    c.fillText('MASTER OF ROPE', W/2, 124);
+    c.fillStyle = '#e2e8f0'; c.font = "900 30px 'Noto Sans JP', sans-serif";
+    c.fillText('合 格 証 書', W/2, 168);
+    c.strokeStyle = '#d4a72c'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(W/2-110, 184); c.lineTo(W/2+110, 184); c.stroke();
+
+    // 級・段名
+    const grade = exam.title.split(':')[0].trim();
+    const sub = (exam.title.split(':')[1]||'').trim();
+    c.fillStyle = '#fde047'; c.font = "900 38px 'Noto Sans JP', sans-serif";
+    c.fillText(grade, W/2, 244);
+    if (sub) { c.fillStyle = '#cbd5e1'; c.font = "bold 18px 'Noto Sans JP', sans-serif"; c.fillText(sub, W/2, 274); }
+
+    // 認定文
+    c.fillStyle = '#94a3b8'; c.font = "15px 'Noto Sans JP', sans-serif";
+    c.fillText('あなたは上記の検定に合格し、', W/2, 314);
+    c.fillText('その実力をここに認めます。', W/2, 338);
+
+    // 振り返りカード
+    const boxY = 366, boxH = reflection ? 120 : 92;
+    c.fillStyle = 'rgba(16,185,129,0.08)';
+    c.strokeStyle = 'rgba(52,211,153,0.4)'; c.lineWidth = 1.5;
+    roundRectPath(c, 60, boxY, W-120, boxH, 12); c.fill(); c.stroke();
+    c.fillStyle = '#34d399'; c.font = "bold 13px 'Noto Sans JP', sans-serif"; c.textAlign='left';
+    c.fillText('🪢 意識したこと', 80, boxY+28);
+    c.fillStyle = '#e2e8f0'; c.font = "16px 'Noto Sans JP', sans-serif";
+    if (reflection) {
+        wrapText(c, reflection, 80, boxY+56, W-160, 24);
+    } else {
+        c.fillStyle = '#64748b'; c.font = "15px 'Noto Sans JP', sans-serif";
+        c.fillText('（自分の言葉で、あとで書いてみよう）', 80, boxY+56);
+    }
+
+    // 現実への一歩（固定メッセージ）
+    const chY = boxY + boxH + 30;
+    c.textAlign='center';
+    c.fillStyle = '#fbbf24'; c.font = "bold 17px 'Noto Sans JP', sans-serif";
+    c.fillText('つぎは、ほんもののなわとびに', W/2, chY);
+    c.fillText('挑戦しよう！', W/2, chY+26);
+
+    // ステータス行
+    const sY = chY + 64;
+    c.fillStyle = '#64748b'; c.font = "12px 'Noto Sans JP', sans-serif";
+    c.fillText(`称号：${getRankFull(save.lifetimeJumps)}　／　累計 ${save.lifetimeJumps.toLocaleString()} 回`, W/2, sY);
+
+    // 日付・署名
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+    c.fillStyle = '#94a3b8'; c.font = "14px 'Noto Sans JP', sans-serif";
+    c.fillText(dateStr, W/2, H-92);
+    c.strokeStyle = 'rgba(212,167,44,0.35)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(60, H-72); c.lineTo(W-60, H-72); c.stroke();
+    c.fillStyle = '#facc15'; c.font = "bold 16px 'Noto Sans JP', sans-serif";
+    c.fillText('なわとび検定本部　へいなか', W/2, H-46);
+    c.fillStyle = '#64748b'; c.font = "11px 'Noto Sans JP', sans-serif";
+    c.fillText('Master of Rope ｜ suzuri.jp/Heino_naka', W/2, H-28);
+
+    c.textAlign = 'left';
+    return cv;
+}
+function roundRectPath(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x+r, y); c.lineTo(x+w-r, y); c.quadraticCurveTo(x+w, y, x+w, y+r);
+    c.lineTo(x+w, y+h-r); c.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    c.lineTo(x+r, y+h); c.quadraticCurveTo(x, y+h, x, y+h-r);
+    c.lineTo(x, y+r); c.quadraticCurveTo(x, y, x+r, y); c.closePath();
+}
+function wrapText(c, text, x, y, maxW, lh) {
+    const chars = [...text]; let line = ''; let yy = y;
+    for (const ch of chars) {
+        if (c.measureText(line + ch).width > maxW) { c.fillText(line, x, yy); line = ch; yy += lh; }
+        else line += ch;
+    }
+    if (line) c.fillText(line, x, yy);
+}
+
 function generateResultCard(headline) {
     const W = 600, H = 360;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -1472,7 +2010,7 @@ function closeShareModal() {
 function downloadCard() {
     if (!shareDataURL) return;
     const a = document.createElement('a');
-    a.href = shareDataURL; a.download = 'master-of-rope.png';
+    a.href = shareDataURL; a.download = 'master-of-rope-証書.png';
     document.body.appendChild(a); a.click(); a.remove();
 }
 function tweetCard() {
@@ -1495,7 +2033,7 @@ async function webShareCard() {
 // 🚀 起動
 // ==========================================
 window.addEventListener('load', () => {
-    loadGame(); renderShop(); renderStages(); renderExams(); resize(); loop();
+    loadGame(); renderShop(); renderStages(); renderExams(); renderDaily(); resize(); loop();
     if (!save.seenTutorial) document.getElementById('howto-box').classList.remove('hidden');
 });
 </script>
