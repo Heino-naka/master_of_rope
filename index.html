@@ -585,13 +585,19 @@ const EXAMS = [
       check:(c,t)=>t.length>=6 && t.slice(-6).every(x=>x==='はやぶさ(あや二重)') },
     { id:'dan3', tier:'段', title:'参段: 三重跳びの衝撃', desc:'三重跳びを連続で4回成功させよ。（レインボー級の装備推奨）', reward:28000,
       check:(c,t)=>t.length>=4 && t.slice(-4).every(x=>x==='三重跳び') },
-    { id:'dan4', tier:'段', title:'四段: 連続三重', desc:'三重跳び系を連続で6回成功させよ。', reward:38000,
-      check:(c,t)=>t.length>=6 && t.slice(-6).every(x=>['三重跳び','つばめ(三重あや)','三重交差跳び'].includes(x)) },
+    { id:'dan4', tier:'段', title:'四段: 連続三重', desc:'三重跳び系を連続で10回成功させよ。', reward:38000,
+      check:(c,t)=>t.length>=10 && t.slice(-10).every(x=>['三重跳び','つばめ(三重あや)','三重交差跳び'].includes(x)) },
     { id:'dan5', tier:'段', title:'五段: つばめ返し', desc:'つばめ（三重あや）または三重交差跳びを連続で4回成功させよ。', reward:50000,
       check:(c,t)=>t.length>=4 && t.slice(-4).every(x=>['つばめ(三重あや)','三重交差跳び'].includes(x)) },
-    // ── 皆伝（かいでん）── 最終試験
-    { id:'master', tier:'皆伝', title:'免許皆伝: 人間卒業', desc:'四重跳び以上を成功させよ。常人には到達不能の領域。', reward:60000,
-      check:(c,t)=>t.some(x=>/^[四五六七八九]重跳び$/.test(x) || (/^\d+重跳び$/.test(x))) }
+    // ── 六段以上 ──
+    { id:'dan6', tier:'段', title:'六段: 四重の領域', desc:'四重跳び以上を連続で10回成功させよ。', reward:60000,
+      check:(c,t)=>t.length>=10 && t.slice(-10).every(x=>{const m=x.match(/^(\d+)重跳び$/); return m && +m[1]>=4;}) },
+    { id:'dan7', tier:'段', title:'七段: つばめ連続', desc:'つばめ（三重あや）を連続で10回成功させよ。', reward:75000,
+      check:(c,t)=>t.length>=10 && t.slice(-10).every(x=>x==='つばめ(三重あや)') },
+    { id:'dan8', tier:'段', title:'八段: 五重の壁', desc:'五重跳び以上を連続で10回成功させよ。', reward:95000,
+      check:(c,t)=>t.length>=10 && t.slice(-10).every(x=>{const m=x.match(/^(\d+)重跳び$/); return m && +m[1]>=5;}) },
+    { id:'dan9', tier:'段', title:'九段: 六重の極み', desc:'六重跳び以上を連続で10回成功させよ。', reward:120000,
+      check:(c,t)=>t.length>=10 && t.slice(-10).every(x=>{const m=x.match(/^(\d+)重跳び$/); return m && +m[1]>=6;}) }
 ];
 
 // ==========================================
@@ -743,6 +749,7 @@ let maxStamina = 140, stamina = 140;
 let examLives = 0, examLivesMax = 0; // 検定中のミス猶予
 let lastSingleCrossed = null;        // 直前の単発ジャンプの開閉状態（あや連続判定用）
 let examWillPass = false;            // 決め技が決まった瞬間に合格をロック（着地で正式終了）
+let trickResolved = false;           // この1ジャンプで技判定を出し終えたか
 let recoverEndTime = 0; // 休憩終了時刻（ミリ秒）
 let tutorialHintLeft = 0; // 初回チュートリアル：あと何回ヒント表示するか
 
@@ -786,9 +793,12 @@ function examProgress(c, t){
         case 'dan1': return { cur: tailRun(t,x=>x==='二重跳び'), need:10, label:'二重跳び 連続' };
         case 'dan2': return { cur: tailRun(t,x=>x==='はやぶさ(あや二重)'), need:6, label:'はやぶさ 連続' };
         case 'dan3': return { cur: tailRun(t,x=>x==='三重跳び'), need:4, label:'三重跳び 連続' };
-        case 'dan4': return { cur: tailRun(t,x=>['三重跳び','つばめ(三重あや)','三重交差跳び'].includes(x)), need:6, label:'三重系 連続' };
+        case 'dan4': return { cur: tailRun(t,x=>['三重跳び','つばめ(三重あや)','三重交差跳び'].includes(x)), need:10, label:'三重系 連続' };
         case 'dan5': return { cur: tailRun(t,x=>['つばめ(三重あや)','三重交差跳び'].includes(x)), need:4, label:'つばめ/三重交差 連続' };
-        case 'master': return { cur: t.some(x=>/^[四五六七八九]重跳び$/.test(x)||/^\d+重跳び$/.test(x))?1:0, need:1, binary:true, label:'四重跳び以上を1回' };
+        case 'dan6': return { cur: tailRun(t,x=>{const m=x.match(/^(\d+)重跳び$/); return m && +m[1]>=4;}), need:10, label:'四重以上 連続' };
+        case 'dan7': return { cur: tailRun(t,x=>x==='つばめ(三重あや)'), need:10, label:'つばめ 連続' };
+        case 'dan8': return { cur: tailRun(t,x=>{const m=x.match(/^(\d+)重跳び$/); return m && +m[1]>=5;}), need:10, label:'五重以上 連続' };
+        case 'dan9': return { cur: tailRun(t,x=>{const m=x.match(/^(\d+)重跳び$/); return m && +m[1]>=6;}), need:10, label:'六重以上 連続' };
     }
     return null;
 }
@@ -842,7 +852,7 @@ function startGame(mode, examId = null) {
     gameState = mode;
     currentExam = examId ? EXAMS.find(e=>e.id===examId) : null;
     lastMode = mode; lastExamId = examId;
-    currentCombo = 0; recentTricks = []; lastSingleCrossed = null; examWillPass = false;
+    currentCombo = 0; recentTricks = []; lastSingleCrossed = null; examWillPass = false; trickResolved = false; jumpSpinCount = 0;
     stamina = maxStamina = 140 + (save.physical.staminaLevel - 1) * 30;
     // 検定のミス猶予（連続条件で1ミス即終了をやめる）。アシストでさらに+2。
     examLivesMax = examLives = (mode === 'EXAM') ? (3 + (save.assist ? 2 : 0)) : 0;
@@ -865,7 +875,7 @@ function startGame(mode, examId = null) {
 
     player.jumpAngle = 0; player.isGrounded = true;
     rope.angle = 0; rope.isSpinning = false;
-    currentRots = []; firstPressAngle = null; crossStreak = 0;
+    currentRots = []; firstPressAngle = null; crossStreak = 0; jumpSpinCount = 0;
 }
 
 function stopGame() {
@@ -1124,6 +1134,7 @@ function getCharStyle() {
         headband: aL>=4, wrist: aL>=7, cape: sL>=6, capeBig: sL>=10, aura: power>=22, crown: power>=28 };
 }
 let currentRots = [];
+let jumpSpinCount = 0;   // この1ジャンプで何回転目か（高度な技ほど消耗を重くする）
 const keys = { Shift: false };
 let touchCross = false;
 let firstPressAngle = null; // このジャンプで最初に回した瞬間の角度（判定用）
@@ -1166,9 +1177,10 @@ function handleSpin() {
     }
     if (!rope.isSpinning) {
         rope.isSpinning = true; rope.angle = 1;
+        jumpSpinCount++;                                   // この回転は何回転目か
         if (firstPressAngle === null) firstPressAngle = player.jumpAngle;
         playSwoosh(rope.getSpeed() / 20);
-        stamina -= rope.getCost();
+        stamina -= rope.getCost() * (1 + (jumpSpinCount - 1) * 0.7);  // 回転を重ねるほど大幅消耗
         spawnSpark(player.x, player.y + 30, ROPES[save.equippedRope].color, 4, 1.5);
         if (stamina <= 0) triggerExhaust();
     }
@@ -1218,7 +1230,6 @@ function completeRotation() {
             addFloater(player.x, player.y - 32, "達成！", "#34d399", 24);
             spawnSpark(player.x, player.y, '#fde047', 18, 2.6);
             flashAlpha = Math.max(flashAlpha, 0.14);
-            playSuccess(currentRots.length, true);                // 達成の手応え（この瞬間）
         }
     }
     return true;
@@ -1229,14 +1240,13 @@ function triggerExamClear(exam) {
     gameState = 'CLEAR';                          // 物理を止め、合格の余韻を見せる
     player.jumpAngle = 0; player.isGrounded = true;
     rope.isSpinning = false; rope.angle = 0;
-    playSuccess(4, true); playCoin();
+    playCoin();   // 合格音はコインのみ（積み重ね成功音=ぶいーんは廃止）
     spawnSpark(player.x, player.y, '#fde047', 36, 3.5);
     spawnSpark(player.x, player.y, '#34d399', 24, 3);
     addFloater(player.x, player.y-46, "🎉 合格！", "#34d399", 30);
     addFloater(player.x, player.y-14, `+${exam.reward.toLocaleString()}`, "#fde047", 20);
     addShake(4, 12); flashAlpha = Math.max(flashAlpha, 0.18);
     cheerTimer = 150;                     // 観客が沸く
-    playApplause(3, false); playCheer(3);
     for (let i=0;i<3;i++) setTimeout(()=>spawnFirework(), i*180);
     document.getElementById('trick-name').innerText = "CLEAR!";
     setStatus("検定合格！ おめでとう！", "emerald");
@@ -1247,6 +1257,7 @@ function fail() {
     if (gameState === 'EXAM' && examWillPass) return;   // 合格確定後の余分な回転で失敗にしない
     playFail(); addShake(7, 14); crossStreak = 0;
     rope.isSpinning = false; rope.angle = 0;   // 仕切り直し（連続失敗を防ぐ）
+    trickResolved = false;
     lastSingleCrossed = null;                   // あや交互もリセット
     spawnSpark(player.x, player.baseY + 40, '#ef4444', 18, 3);
     if (gameState === 'EXAM') {
@@ -1256,7 +1267,7 @@ function fail() {
         updateExamHud();
         if (examLives > 0) {
             // まだ挑戦継続。連続カウントだけリセットして仕切り直し。
-            currentCombo = 0; currentRots = []; recentTricks = []; firstPressAngle = null;
+            currentCombo = 0; currentRots = []; recentTricks = []; firstPressAngle = null; jumpSpinCount = 0;
             addFloater(player.x, player.y - 10, `ミス！ のこり ♥×${examLives}`, "#f87171", 20);
             setStatus(`ミス…のこり ${examLives}回（連続はリセット、跳び続けてOK）`, "red");
             document.getElementById('trick-name').innerText = "MISS";
@@ -1271,7 +1282,7 @@ function fail() {
         addFloater(player.x, player.y - 10, "ひっかかった！", "#f87171", 22);
         setStatus("引っかかった！タイミングが遅すぎ", "red");
         document.getElementById('trick-name').innerText = "FAIL";
-        currentCombo = 0; currentRots = []; recentTricks = []; firstPressAngle = null;
+        currentCombo = 0; currentRots = []; recentTricks = []; firstPressAngle = null; jumpSpinCount = 0;
         updateUI();
     }
 }
@@ -1324,16 +1335,13 @@ function spawnFirework(){
 function celebrate(mult){
     if (mult < 32) return;
     const tier = mult>=130 ? 4 : mult>=100 ? 3 : mult>=50 ? 2 : 1;
-    const recent = (frameCount - lastCelebrateAt) < 110;   // 直前にも沸いた＝連続技中は控えめに
     lastCelebrateAt = frameCount;
-    cheerTimer = Math.max(cheerTimer, tier>=3 ? 80 : 52);  // 観客が拍手する時間
-    playApplause(tier, recent);
-    if (tier>=3) playCheer(tier);
-    spawnSpark(player.x, player.y-12, '#fde047', recent?5:(7+tier*3), 2.4);
-    if (!recent){
-        if (tier>=2){ const n = tier>=4?4 : tier>=3?2 : 1; for(let i=0;i<n;i++) spawnFirework(); }
-        if (tier>=4) flashAlpha = Math.max(flashAlpha, 0.12);
-    }
+    cheerTimer = Math.max(cheerTimer, tier>=3 ? 80 : 52);  // 観客が拍手する時間（モーションのみ）
+    // 拍手音・歓声音は廃止（花火の音と縄の音は残す）。視覚演出はそのまま
+    spawnSpark(player.x, player.y-12, '#fde047', 7+tier*3, 2.4);
+    // 三重以上は連続成功でも毎回きちんと花火を出す（以前の連続抑制をやめる）
+    if (tier>=2){ const n = tier>=4?4 : tier>=3?2 : 1; for(let i=0;i<n;i++) spawnFirework(); }
+    if (tier>=4) flashAlpha = Math.max(flashAlpha, 0.12);
 }
 
 function addShake(mag, t){ shake.mag = Math.max(shake.mag, mag); shake.t = Math.max(shake.t, t); }
@@ -1391,6 +1399,61 @@ function drawEffects(){
 // ==========================================
 // 🎨 レンダリング・ループ
 // ==========================================
+function resolveTrick() {
+                let tn = getTrick(currentRots);
+                currentCombo++;
+                // あや跳び＝前⇄交差の交互。直前の単発の開閉と異なれば「あや」とみなし、交互が続くかぎり連続カウントできる
+                const single = currentRots.length === 1;
+                const crossedNow = single ? !!currentRots[0] : null;
+                if (single && lastSingleCrossed !== null && crossedNow !== lastSingleCrossed) tn = "あや跳び";
+                lastSingleCrossed = single ? crossedNow : null;   // 多回転が入ると交互は途切れる
+                recentTricks.push(tn); if(recentTricks.length>20) recentTricks.shift();
+
+                // 連続「全交差」の疲労カウント（開いた回転が混ざればリセット）
+                if (currentRots.length > 0 && currentRots.every(r=>r)) crossStreak++; else crossStreak = 0;
+
+                // タイミング判定
+                const win = getPressWindow();
+                let timing = "GOOD", tmult = 1.0;
+                if (firstPressAngle !== null) {
+                    if (firstPressAngle <= win.perfectEnd) { timing="PERFECT"; tmult=1.6; }
+                    else if (firstPressAngle <= win.goodEnd) { timing="GOOD"; tmult=1.0; }
+                    else { timing="GOOD"; tmult=0.9; }
+                }
+                const rots = currentRots.length;
+
+                if (gameState === 'PRACTICE') {
+                    const comboBonus = 1 + Math.min(currentCombo,100)*0.03;
+                    const gain = Math.round(getMult(tn) * ROPES[save.equippedRope].mult * comboBonus * tmult * gainMultiplier());
+                    save.totalJumps += gain;
+                    addFloater(player.x+30, player.y, `+${gain}`, "#fde047", 18);
+                    updateDailyProgress(tn, currentCombo);   // 今日のミッション進捗
+                }
+                save.lifetimeJumps += rots;
+                if (currentCombo > save.highCombo) save.highCombo = currentCombo;
+
+                // 演出
+                const isBig = rots >= 2;
+                const col = ROPES[save.equippedRope].color;
+                spawnSpark(player.x, player.y, col, 8 + rots*8, 2 + rots*0.8);
+                if (timing==="PERFECT") { addFloater(player.x, player.y-30, "PERFECT!", "#34d399", 18); flashAlpha=Math.max(flashAlpha,0.14); }
+                addFloater(player.x, player.y-(timing==="PERFECT"?52:30), tn, isBig?"#22d3ee":"#fbbf24", isBig?22:16);
+                if (isBig) { addShake(4+rots*2, 10); flashAlpha=Math.max(flashAlpha,0.18); }
+                celebrate(getMult(tn));   // はやぶさ以上で拍手・歓声・花火
+                if (currentCombo>0 && currentCombo%10===0) addFloater(player.x, player.y-70, `${currentCombo} COMBO!`, "#a78bfa", 20);
+
+                document.getElementById('trick-name').innerText = tn;
+                setStatus(`COMBO ${currentCombo}！ ${timing}`, timing==="PERFECT"?"emerald":"yellow");
+                comboPulse();
+                if (tutorialHintLeft>0) tutorialHintLeft--;
+                saveGame();
+                if (gameState === 'EXAM') updateExamHud();   // 進捗ゲージを更新
+
+                if (gameState === 'EXAM' && (examWillPass || currentExam.check(currentCombo, recentTricks))) {
+                    triggerExamClear(currentExam);
+                }
+}
+
 function loop() {
     updateEffects();
     frameCount++;
@@ -1442,62 +1505,7 @@ function loop() {
 
         if (player.jumpAngle >= 360) {
             player.jumpAngle = 0;
-            if (currentRots.length > 0) {
-                let tn = getTrick(currentRots);
-                currentCombo++;
-                // あや跳び＝前⇄交差の交互。直前の単発の開閉と異なれば「あや」とみなし、交互が続くかぎり連続カウントできる
-                const single = currentRots.length === 1;
-                const crossedNow = single ? !!currentRots[0] : null;
-                if (single && lastSingleCrossed !== null && crossedNow !== lastSingleCrossed) tn = "あや跳び";
-                lastSingleCrossed = single ? crossedNow : null;   // 多回転が入ると交互は途切れる
-                recentTricks.push(tn); if(recentTricks.length>20) recentTricks.shift();
-
-                // 連続「全交差」の疲労カウント（開いた回転が混ざればリセット）
-                if (currentRots.length > 0 && currentRots.every(r=>r)) crossStreak++; else crossStreak = 0;
-
-                // タイミング判定
-                const win = getPressWindow();
-                let timing = "GOOD", tmult = 1.0;
-                if (firstPressAngle !== null) {
-                    if (firstPressAngle <= win.perfectEnd) { timing="PERFECT"; tmult=1.6; }
-                    else if (firstPressAngle <= win.goodEnd) { timing="GOOD"; tmult=1.0; }
-                    else { timing="GOOD"; tmult=0.9; }
-                }
-                const rots = currentRots.length;
-
-                if (gameState === 'PRACTICE') {
-                    const comboBonus = 1 + Math.min(currentCombo,100)*0.03;
-                    const gain = Math.round(getMult(tn) * ROPES[save.equippedRope].mult * comboBonus * tmult * gainMultiplier());
-                    save.totalJumps += gain;
-                    addFloater(player.x+30, player.y, `+${gain}`, "#fde047", 18);
-                    updateDailyProgress(tn, currentCombo);   // 今日のミッション進捗
-                }
-                save.lifetimeJumps += rots;
-                if (currentCombo > save.highCombo) save.highCombo = currentCombo;
-
-                // 演出
-                const isBig = rots >= 2;
-                const col = ROPES[save.equippedRope].color;
-                spawnSpark(player.x, player.y, col, 8 + rots*8, 2 + rots*0.8);
-                if (timing==="PERFECT") { addFloater(player.x, player.y-30, "PERFECT!", "#34d399", 18); flashAlpha=Math.max(flashAlpha,0.14); }
-                addFloater(player.x, player.y-(timing==="PERFECT"?52:30), tn, isBig?"#22d3ee":"#fbbf24", isBig?22:16);
-                if (isBig) { addShake(4+rots*2, 10); flashAlpha=Math.max(flashAlpha,0.18); }
-                playSuccess(rots, timing==="PERFECT");
-                celebrate(getMult(tn));   // はやぶさ以上で拍手・歓声・花火
-                if (currentCombo>0 && currentCombo%10===0) addFloater(player.x, player.y-70, `${currentCombo} COMBO!`, "#a78bfa", 20);
-
-                document.getElementById('trick-name').innerText = tn;
-                setStatus(`COMBO ${currentCombo}！ ${timing}`, timing==="PERFECT"?"emerald":"yellow");
-                comboPulse();
-                if (tutorialHintLeft>0) tutorialHintLeft--;
-                saveGame();
-                if (gameState === 'EXAM') updateExamHud();   // 進捗ゲージを更新
-
-                if (gameState === 'EXAM' && (examWillPass || currentExam.check(currentCombo, recentTricks))) {
-                    triggerExamClear(currentExam);
-                }
-            }
-            currentRots = []; firstPressAngle = null; examWillPass = false;
+            currentRots = []; firstPressAngle = null; examWillPass = false; trickResolved = false; jumpSpinCount = 0;
         }
 
         const rad = (player.jumpAngle*Math.PI)/180;
@@ -1509,7 +1517,11 @@ function loop() {
             // 接地中＝予備動作（しゃがんでため、踏み切りへ）
             player.prepProg = Math.max(0, Math.min(1, (player.jumpAngle - 180) / 180));
             player.y = player.baseY;
-            if (!player.isGrounded) { player.isGrounded=true; player.isKneeling=true; player.kneelTimer=6; spawnDust(player.x, gY); }
+            if (!player.isGrounded) {
+                player.isGrounded=true; player.isKneeling=true; player.kneelTimer=6; spawnDust(player.x, gY);
+                // 技判定は「着地の瞬間」に出す（縄が回り切っており、これ以上回転は足せない）
+                if (currentRots.length > 0 && !rope.isSpinning && !trickResolved) { trickResolved = true; resolveTrick(); }
+            }
             if (player.isKneeling) if (--player.kneelTimer<=0) player.isKneeling=false;
         }
 
@@ -1714,9 +1726,9 @@ function drawCloud(x,y,s){
 }
 // ===== 観客ギャラリー（入段から段位合格で増える）=====
 function galleryCount(){
-    const dan = ['dan0','dan1','dan2','dan3','dan4','dan5','master'];
+    const dan = ['dan0','dan1','dan2','dan3','dan4','dan5','dan6','dan7','dan8','dan9'];
     const n = dan.filter(id => (save.passedExams||[]).includes(id)).length;
-    return [0,4,8,13,20,30,45,64][n] || 0;
+    return [0,4,8,13,20,28,37,46,55,64,70][n] || 0;
 }
 function ensureGallery(){
     if (_gallery) return;
@@ -1786,7 +1798,7 @@ function drawGallery(gY, t){
         ctx.fillStyle = '#b91c1c'; ctx.fillRect(VW/2-86, gY-42, 172, 15);
         ctx.fillStyle = '#7f1d1d'; ctx.fillRect(VW/2-86, gY-29, 172, 2);
         ctx.fillStyle = '#fde68a'; ctx.font = "bold 11px 'Noto Sans JP', sans-serif"; ctx.textAlign='center';
-        ctx.fillText('祝　免許皆伝', VW/2, gY-31);
+        ctx.fillText('祝　九段到達', VW/2, gY-31);
     }
 
     // 観客本体：水平線付近の薄い帯に密集（奥行きはサイズ＋わずかな縦差のみ＝浮かない）
@@ -2327,7 +2339,10 @@ function bridgeMessage(examId) {
         dan3: ['三重跳びは一流の証。', '本物で1回跳べたら、大したものだ。'],
         dan4: ['三重を連続で。もう達人級。', '安全な場所で、無理せずいこう。'],
         dan5: ['つばめ返しは超高難度。', 'ここまで来たら、君は縄の達人。'],
-        master: ['四重跳びは世界レベル。', 'でも一番大事なのは、跳ぶ楽しさ。'],
+        dan6: ['四重跳びは世界レベル。', 'でも一番大事なのは、跳ぶ楽しさ。'],
+        dan7: ['つばめを10回続ける集中力。', 'リズムと呼吸を、体で覚えよう。'],
+        dan8: ['五重跳びは人間離れの域。', '焦らず、一歩ずつ深めていこう。'],
+        dan9: ['六重跳び——もう伝説の領域。', '楽しむ心を忘れずに、跳び続けよう。'],
     };
     return M[examId] || ['つぎは、ほんもののなわとびに', '挑戦しよう！'];
 }
