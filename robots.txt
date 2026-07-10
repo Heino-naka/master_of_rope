@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://heino-naka.github.io/master_of_rope/sitemap.xml
